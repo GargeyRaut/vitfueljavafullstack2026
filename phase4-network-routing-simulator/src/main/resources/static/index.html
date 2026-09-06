@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Routing Simulator — Learn by doing</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #263449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-dim: #0c4a6e;
+    --good: #4ade80;
+    --bad: #f87171;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pulseRing { 0% { stroke-width: 2; opacity: 1; } 70% { stroke-width: 10; opacity: 0; } 100% { stroke-width: 10; opacity: 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes slideOutRight { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(24px); } }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  main .panel { animation: fadeInUp 0.35s ease both; }
+  main .panel:nth-child(2) { animation-delay: 0.05s; }
+  main .panel:nth-child(3) { animation-delay: 0.1s; }
+  tbody tr { animation: rowIn 0.25s ease both; }
+  header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .links { display: flex; gap: 16px; align-items: center; }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  #helpBtn {
+    background: var(--accent); color: #06202f; border: none; border-radius: 999px;
+    width: 30px; height: 30px; font-weight: 700; cursor: pointer; font-size: 14px;
+  }
+  main {
+    display: grid;
+    grid-template-columns: 260px 1fr 340px;
+    gap: 16px;
+    padding: 16px 24px;
+    align-items: start;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  select, input, button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 13px;
+    width: 100%;
+    margin-bottom: 4px;
+    transition: filter 0.15s ease, transform 0.08s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input:focus, select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(56,189,248,0.25);
+  }
+  label.field { display: block; margin-bottom: 8px; }
+  label.field .fname { font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .hint { font-size: 11px; color: var(--muted); margin: 0 0 8px; line-height: 1.4; }
+  button {
+    cursor: pointer;
+    background: var(--accent);
+    color: #06202f;
+    font-weight: 600;
+    border: none;
+    margin-top: 4px;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--bad); color: #2a0a0a; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.25s ease, color 0.25s ease, transform 0.15s ease; }
+  .pill:hover { transform: scale(1.08); }
+  .pill.up { background: rgba(74,222,128,0.15); color: var(--good); }
+  .pill.down { background: rgba(248,113,113,0.15); color: var(--bad); }
+  #topoList div, #eventLog div {
+    padding: 6px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12.5px;
+    background: var(--panel-2); cursor: pointer;
+  }
+  #topoList div.active { outline: 1px solid var(--accent); }
+  #eventLog { max-height: 190px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11px; }
+  #eventLog div { cursor: default; }
+  #simResult { font-size: 13px; line-height: 1.5; }
+  #simResult .ok { color: var(--good); font-weight: 600; }
+  #simResult .fail { color: var(--bad); font-weight: 600; }
+  #simResult .explain { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .del-btn { background: none; border: none; color: var(--bad); width: auto; padding: 0 4px; margin: 0; font-size: 13px; }
+  .info-box {
+    background: var(--accent-dim); border: 1px solid #0369a1; border-radius: 8px;
+    padding: 10px; font-size: 11.5px; line-height: 1.5; color: #bae6fd; margin-bottom: 10px;
+  }
+  #algoExplain {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 11.5px; line-height: 1.5; color: var(--muted); margin: 6px 0 10px;
+  }
+  #graphWrap { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .graph-toolbar { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); align-items: center; }
+  .graph-toolbar button { width: auto; padding: 4px 10px; margin: 0; }
+  #graphSvg { width: 100%; height: 320px; display: block; cursor: grab; background: #182436; }
+  #graphSvg.panning { cursor: grabbing; }
+  .node-label { fill: var(--text); font-size: 11px; font-weight: 600; text-anchor: middle; pointer-events: none; user-select: none; }
+  .link-label { fill: var(--muted); font-size: 9px; text-anchor: middle; pointer-events: none; }
+  .graph-hint { padding: 6px 10px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
+  .ctx-menu {
+    position: fixed; display: none; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); z-index: 60; overflow: hidden; min-width: 160px;
+  }
+  .ctx-menu button {
+    display: block; width: 100%; text-align: left; background: none; color: var(--text);
+    border: none; border-radius: 0; padding: 8px 12px; font-size: 12.5px; font-weight: 400; margin: 0;
+  }
+  .ctx-menu button:hover { background: var(--panel-2); }
+  .ctx-menu button.danger-item { color: var(--bad); }
+
+  /* modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 560px; width: 92%; max-height: 80vh; overflow-y: auto; padding: 20px 24px;
+  }
+  .modal h3 { margin-top: 0; font-size: 16px; }
+  .modal dt { color: var(--accent); font-weight: 600; margin-top: 10px; font-size: 13px; }
+  .modal dd { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .modal .close-row { text-align: right; margin-top: 16px; }
+  .modal button { width: auto; padding: 8px 18px; }
+
+  /* toasts */
+  #toastContainer {
+    position: fixed; bottom: 20px; right: 20px; z-index: 100;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  }
+  .toast {
+    background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    border-radius: 8px; padding: 10px 14px; font-size: 12.5px; box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    animation: slideInRight 0.25s ease both; max-width: 300px;
+  }
+  .toast.success { border-left-color: var(--good); }
+  .toast.error { border-left-color: var(--bad); }
+  .toast.closing { animation: slideOutRight 0.2s ease both; }
+
+  /* spinner */
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+
+  /* node pulse for selected source/dest */
+  .pulse-ring { animation: pulseRing 1.4s ease-out infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌐 Network Routing Simulator — learn by doing</h1>
+  <div class="links">
+    <a href="/learn/index.html">📘 Learn</a>
+    <a href="/swagger-ui.html" target="_blank">API docs ↗</a>
+    <button id="helpBtn" onclick="openHelp()" title="Glossary of terms">?</button>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: topologies -->
+  <div class="panel">
+    <h2>Topologies</h2>
+    <div class="info-box">
+      A <b>topology</b> is the network you're building: a set of
+      <b>routers</b> (the nodes) connected by <b>links</b> (the edges).
+      Create one, then add routers and links to it on the right.
+    </div>
+    <div id="topoList"><p class="muted"><span class="spinner"></span>Loading…</p></div>
+    <label class="field">
+      <span class="fname">New topology name</span>
+      <input id="newTopoName" placeholder="e.g. campus-network">
+    </label>
+    <button onclick="createTopology()">+ Create topology</button>
+    <hr style="border-color: var(--border); margin: 10px 0;">
+    <button class="secondary" onclick="exportTopology()">Export JSON</button>
+    <button class="danger" onclick="deleteTopology()">Delete topology</button>
+  </div>
+
+  <!-- CENTER: graph + editor + simulation -->
+  <div class="panel">
+    <h2>Network topology editor</h2>
+    <div id="graphWrap">
+      <div class="graph-toolbar">
+        <button class="secondary" style="width:auto;" onclick="zoomBy(1.2)" title="Zoom in">＋</button>
+        <button class="secondary" style="width:auto;" onclick="zoomBy(0.8)" title="Zoom out">－</button>
+        <button class="secondary" style="width:auto;" onclick="resetView()" title="Reset pan/zoom">⤢ Reset view</button>
+        <span class="muted" id="zoomLabel" style="margin-left:auto;">100%</span>
+      </div>
+      <svg id="graphSvg" viewBox="0 0 900 460">
+        <defs>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#2c3b52" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <rect id="gridBg" x="-2000" y="-2000" width="6000" height="6000" fill="url(#grid)"/>
+        <g id="graphContent"></g>
+      </svg>
+      <div class="graph-hint">
+        <b>Drag</b> a router to reposition it (saved locally). <b>Click</b> a router to set it as
+        <b>source</b>, click another for <b>destination</b>. <b>Drag empty space</b> to pan,
+        <b>scroll</b> to zoom. <b>Right-click</b> a router or link for quick actions.
+        Green = UP, red dashed = DOWN, blue = the path from your last simulation.
+      </div>
+    </div>
+    <div id="ctxMenu" class="ctx-menu"></div>
+
+    <h2>Routers <span class="muted" style="text-transform:none;font-weight:400;">— the nodes in your network</span></h2>
+    <div class="hint">A router just needs a short label (like "R1" or "NYC"). The system assigns it a unique internal ID.</div>
+    <div class="row">
+      <input id="newRouterLabel" placeholder="Router label (e.g. R5)">
+      <button style="max-width:120px" onclick="addRouter()">+ Add</button>
+    </div>
+    <table>
+      <thead><tr><th>ID</th><th>Label</th><th title="Click to toggle — DOWN simulates a router outage">Status</th><th></th></tr></thead>
+      <tbody id="routerTable"></tbody>
+    </table>
+
+    <h2 style="margin-top:16px;">Links <span class="muted" style="text-transform:none;font-weight:400;">— connections between routers</span></h2>
+    <div class="hint">
+      <b>Bandwidth</b>: higher = a given packet spends less time "in flight" on this link (queuing/transmission delay).
+      <b>Latency</b>: the fixed propagation delay in milliseconds — this is what routing algorithms treat as the link's "cost".
+      <b>Reliability %</b>: chance a packet survives crossing this link; below 100% means occasional random loss.
+    </div>
+    <div class="row">
+      <select id="linkSource"></select>
+      <select id="linkTarget"></select>
+    </div>
+    <div class="row">
+      <label class="field"><span class="fname">Bandwidth (Mbps)</span><input id="linkBandwidth" value="100"></label>
+      <label class="field"><span class="fname">Latency (ms)</span><input id="linkLatency" value="5"></label>
+      <label class="field"><span class="fname">Reliability (%)</span><input id="linkReliability" value="100"></label>
+    </div>
+    <button onclick="addLink()">+ Add link (bidirectional)</button>
+    <table>
+      <thead><tr><th>Source→Target</th><th>Lat</th><th>BW</th><th title="Click to toggle — DOWN simulates a link failure">Status</th><th></th></tr></thead>
+      <tbody id="linkTable"></tbody>
+    </table>
+
+    <h2 style="margin-top:16px;">Run a simulation</h2>
+    <div class="hint">
+      Pick a <b>source</b> and <b>destination</b> router (or click them on the graph above), pick an
+      algorithm, then run it. One packet is sent along the computed path, hop by hop.
+    </div>
+    <div class="row">
+      <label class="field"><span class="fname">Source</span><select id="simSource" onchange="updateGraphSelection()"></select></label>
+      <label class="field"><span class="fname">Destination</span><select id="simDest" onchange="updateGraphSelection()"></select></label>
+    </div>
+    <label class="field">
+      <span class="fname">Routing algorithm</span>
+      <select id="simAlgorithm" onchange="renderAlgoExplain()">
+        <option value="dijkstra">Dijkstra</option>
+        <option value="bellman-ford">Bellman-Ford</option>
+        <option value="distance-vector">Distance Vector</option>
+      </select>
+    </label>
+    <div id="algoExplain"></div>
+
+    <button onclick="runSimulation()">▶ Run simulation</button>
+    <button class="secondary" onclick="analyzeTopology()">📊 Analyze all pairs (reachability + avg latency)</button>
+    <div class="row">
+      <label class="field"><span class="fname">Packet count</span><input id="batchCount" value="20"></label>
+      <button class="secondary" style="align-self:end;max-width:160px" onclick="runBatch()">🔁 Batch simulate</button>
+    </div>
+    <div class="hint">Batch simulate fires many packets on the same route to show real loss % and latency jitter — a single run only shows one random outcome.</div>
+    <div id="simResult" style="margin-top:6px;"></div>
+
+    <h2 style="margin-top:16px;">Routing table <span class="muted" style="text-transform:none;font-weight:400;">— what the source router "knows"</span></h2>
+    <div class="hint">
+      A real router doesn't just know one route — it keeps a table of the best-known path to
+      <i>every</i> destination. This computes that full table for your selected source router by
+      simulating a packet to every other router.
+    </div>
+    <button class="secondary" onclick="showRoutingTable()">🧭 Compute routing table for source</button>
+    <div id="routingTableBox" style="margin-top:6px;"></div>
+
+    <h2 style="margin-top:16px;">Live background traffic</h2>
+    <div class="hint">Continuously sends packets between random routers so you can watch a network "breathe" — try toggling a link DOWN while this runs.</div>
+    <div class="row">
+      <label class="field"><span class="fname">Interval (ms)</span><input id="trafficInterval" value="500"></label>
+      <button style="max-width:110px;align-self:end;" onclick="startTraffic()">▶ Start</button>
+      <button class="secondary" style="max-width:110px;align-self:end;" onclick="stopTraffic()">■ Stop</button>
+    </div>
+    <div id="trafficStats" class="muted">Not running.</div>
+
+    <h2 style="margin-top:16px;">Snapshots <span class="muted" style="text-transform:none;font-weight:400;">— a saved point-in-time reading</span></h2>
+    <button class="secondary" onclick="captureSnapshot()">📸 Capture snapshot</button>
+    <table>
+      <thead><tr><th>Captured</th><th>Routers</th><th>Links</th><th>Avg link ms</th></tr></thead>
+      <tbody id="snapshotTable"></tbody>
+    </table>
+  </div>
+
+  <!-- RIGHT: live events + concepts + history -->
+  <div class="panel">
+    <h2>What just happened?</h2>
+    <div id="lastExplain" class="hint">Run a simulation to see a step-by-step explanation here.</div>
+
+    <h2 style="margin-top:12px;">Live event stream</h2>
+    <div class="hint">Each line is one step the packet took, in simulated milliseconds — not real time.</div>
+    <div id="eventLog"><p class="muted">Run a simulation to see events.</p></div>
+
+    <h2 style="margin-top:16px;">Run history</h2>
+    <table>
+      <thead><tr><th>Algo</th><th>Status</th><th>Route</th></tr></thead>
+      <tbody id="historyTable"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Help / glossary modal -->
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal">
+    <h3>📘 Glossary</h3>
+    <dl>
+      <dt>Router</dt><dd>A node in the network. In real life: a device that forwards packets. Here: just an id + label + up/down status.</dd>
+      <dt>Link</dt><dd>A connection between two routers, with bandwidth, latency, and reliability. Routing algorithms use latency as the "cost" of crossing it.</dd>
+      <dt>Latency</dt><dd>Fixed propagation delay (ms) for one hop across a link — think of it as physical distance/wire delay.</dd>
+      <dt>Bandwidth</dt><dd>How much data per second a link can carry (Mbps). Larger packets on lower-bandwidth links add extra queuing delay.</dd>
+      <dt>Reliability %</dt><dd>The chance a packet survives crossing a link. 95% reliability means roughly 1 in 20 packets gets dropped there.</dd>
+      <dt>Jitter</dt><dd>Random variation in latency between packets on the same route — shows up clearly when you batch-simulate many packets.</dd>
+      <dt>Hop count</dt><dd>How many links a packet crossed to get from source to destination.</dd>
+      <dt>TTL (Time To Live)</dt><dd>A safety limit on hops — if a packet bounces around longer than its TTL, it's dropped to prevent infinite loops.</dd>
+      <dt>Routing table</dt><dd>Each router's map of "to reach destination X, send the packet to neighbor Y next" — computed fresh before every simulation by the chosen algorithm.</dd>
+      <dt>Next hop</dt><dd>The very next router a packet is forwarded to — a router doesn't need to know the *whole* path, just the next step.</dd>
+      <dt>Fault injection</dt><dd>Manually setting a router or link to DOWN, to see how routing reacts to failures — click any status pill to toggle it.</dd>
+      <dt>Dijkstra</dt><dd>Always expands the closest not-yet-visited router next. Fast, and the basis for real protocols like OSPF.</dd>
+      <dt>Bellman-Ford</dt><dd>Repeatedly relaxes every link until distances stop improving. Slower than Dijkstra, but simple and robust.</dd>
+      <dt>Distance Vector</dt><dd>Each router only knows what its direct neighbors report ("I can reach X for cost Y") and gradually converges — this is how RIP and similar protocols actually work, without any router seeing the whole map.</dd>
+      <dt>Batch simulation</dt><dd>Fires many packets on the same route at once, to reveal the real loss % and latency spread instead of one random outcome.</dd>
+      <dt>Snapshot</dt><dd>A saved reading of the topology's size and average link latency at a point in time, stored in its own SQL table.</dd>
+    </dl>
+    <div class="close-row"><button onclick="closeHelp()">Got it</button></div>
+  </div>
+</div>
+
+<!-- First-visit tour -->
+<div class="modal-backdrop" id="tourModal">
+  <div class="modal">
+    <h3>👋 New here?</h3>
+    <p class="hint" style="font-size:12.5px;">
+      This tool teaches network routing by letting you build a small network and watch packets
+      actually move through it.
+    </p>
+    <p class="hint" style="font-size:12.5px;">
+      <b>1.</b> Create a topology (left panel) — or use the demo one that's already there.<br>
+      <b>2.</b> Add a few routers and connect them with links (center panel) — hover the labels for hints.<br>
+      <b>3.</b> On the graph: drag a router to reposition it, drag empty space to pan, scroll to zoom,
+      right-click for quick actions. Click two routers to set source/destination.<br>
+      <b>4.</b> Pick an algorithm and hit Run — watch the path light up and the event log fill in on the right.<br>
+      <b>5.</b> Try toggling a link DOWN mid-way and re-running — see the route change.<br>
+      <b>6.</b> Click the <b>?</b> button any time for definitions, or open the
+      <b>📘 Learn</b> link up top for a full walkthrough of a routing concept.
+    </p>
+    <div class="close-row"><button onclick="closeTour()">Let's go</button></div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+let topologies = [];
+let currentTopoId = null;
+let currentTopo = null;
+let stompClient = null;
+let selectedSource = null;
+let selectedDest = null;
+let nodePositions = {};
+
+const ALGO_EXPLAIN = {
+  'dijkstra': "Dijkstra's algorithm always expands the closest not-yet-visited router next, guaranteeing the cheapest total-latency path. It's what real-world link-state protocols like OSPF are based on. Fast and exact.",
+  'bellman-ford': "Bellman-Ford relaxes every link in the network, up to (router count − 1) times, gradually improving its distance estimates until nothing changes anymore. Slower than Dijkstra, but simple and handles more general cases.",
+  'distance-vector': "Distance-vector routing mirrors how real routers actually work without seeing the whole map: each router only hears \"I can reach X for cost Y\" from its direct neighbors, and updates its own table as that gossip arrives — this is the idea behind RIP."
+};
+
+function renderAlgoExplain() {
+  const algo = document.getElementById('simAlgorithm').value;
+  document.getElementById('algoExplain').textContent = ALGO_EXPLAIN[algo] || '';
+}
+
+function openHelp() { document.getElementById('helpModal').classList.add('open'); }
+function closeHelp() { document.getElementById('helpModal').classList.remove('open'); }
+function closeTour() {
+  document.getElementById('tourModal').classList.remove('open');
+  try { localStorage.setItem('netsim-tour-seen', '1'); } catch (e) {}
+}
+
+// ---------- Toasts ----------
+function showToast(message, type) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type ? ' ' + type : '');
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('closing');
+    setTimeout(() => toast.remove(), 220);
+  }, 2800);
+}
+
+// ---------- Keyboard shortcuts ----------
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return; // don't hijack typing
+
+  if (e.key === 'Escape') {
+    hideCtxMenu();
+    document.getElementById('helpModal').classList.remove('open');
+    document.getElementById('tourModal').classList.remove('open');
+  } else if (e.key === '+' || e.key === '=') {
+    zoomBy(1.2);
+  } else if (e.key === '-' || e.key === '_') {
+    zoomBy(0.83);
+  } else if (e.key === 'r' || e.key === 'R') {
+    resetView();
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSource && !selectedDest) {
+    e.preventDefault();
+    if (confirm(`Delete router ${labelFor(selectedSource)}?`)) deleteRouter(selectedSource);
+  }
+});
+
+async function api(path, opts) {
+  const res = await fetch('/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(body.message || res.statusText);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function loadTopologies() {
+  topologies = await api('/topologies');
+  const list = document.getElementById('topoList');
+  if (topologies.length === 0) {
+    list.innerHTML = '<p class="muted">No topologies yet — create one below.</p>';
+    return;
+  }
+  list.innerHTML = '';
+  topologies.forEach(t => {
+    const div = document.createElement('div');
+    div.textContent = `${t.name} (${t.routerCount}R / ${t.linkCount}L)`;
+    div.className = t.id === currentTopoId ? 'active' : '';
+    div.onclick = () => selectTopology(t.id);
+    list.appendChild(div);
+  });
+  if (!currentTopoId && topologies.length > 0) {
+    selectTopology(topologies[0].id);
+  }
+}
+
+async function selectTopology(id) {
+  currentTopoId = id;
+  selectedSource = null;
+  selectedDest = null;
+  nodePositions = {};
+  currentTopo = await api(`/topologies/${id}/export`);
+  renderTopology();
+  renderGraph();
+  loadTopologies();
+  loadHistory();
+  loadSnapshots();
+  pollTraffic();
+}
+
+function renderTopology() {
+  const routerTable = document.getElementById('routerTable');
+  const linkTable = document.getElementById('linkTable');
+  const selects = ['linkSource', 'linkTarget', 'simSource', 'simDest'].map(id => document.getElementById(id));
+
+  if (!currentTopo) { routerTable.innerHTML = ''; linkTable.innerHTML = ''; return; }
+
+  routerTable.innerHTML = currentTopo.routers.map(r => `
+    <tr>
+      <td>${r.id}</td>
+      <td>${r.label}</td>
+      <td><span class="pill ${r.status === 'UP' ? 'up' : 'down'}" onclick="toggleRouter('${r.id}','${r.status}')">${r.status}</span></td>
+      <td><button class="del-btn" onclick="deleteRouter('${r.id}')">✕</button></td>
+    </tr>`).join('');
+
+  linkTable.innerHTML = currentTopo.links.map(l => `
+    <tr>
+      <td>${labelFor(l.sourceId)} → ${labelFor(l.targetId)}</td>
+      <td>${l.latencyMs}ms</td>
+      <td>${l.bandwidthMbps}Mbps</td>
+      <td><span class="pill ${l.status === 'UP' ? 'up' : 'down'}" onclick="toggleLink('${l.id}','${l.status}')">${l.status}</span></td>
+      <td><button class="del-btn" onclick="deleteLink('${l.id}')">✕</button></td>
+    </tr>`).join('');
+
+  selects.forEach(sel => {
+    const keep = sel.value;
+    sel.innerHTML = currentTopo.routers.map(r => `<option value="${r.id}">${r.label}</option>`).join('');
+    if (currentTopo.routers.some(r => r.id === keep)) sel.value = keep;
+  });
+  renderAlgoExplain();
+}
+
+function labelFor(routerId) {
+  if (!currentTopo) return routerId;
+  const r = currentTopo.routers.find(r => r.id === routerId);
+  return r ? r.label : routerId;
+}
+
+// ---------- Topology canvas editor: pan, zoom, drag, context menu ----------
+const BASE_VB = { x: 0, y: 0, w: 900, h: 460 };
+let viewBox = { ...BASE_VB };
+let currentHighlightPath = null;
+let dragState = { mode: 'none' };
+const MIN_VB_W = 220, MAX_VB_W = 3200;
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function setViewBox() {
+  document.getElementById('graphSvg').setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+  document.getElementById('zoomLabel').textContent = Math.round((BASE_VB.w / viewBox.w) * 100) + '%';
+}
+
+function resetView() { viewBox = { ...BASE_VB }; setViewBox(); }
+
+function zoomBy(factor) {
+  const cx = viewBox.x + viewBox.w / 2, cy = viewBox.y + viewBox.h / 2;
+  const newW = clamp(viewBox.w / factor, MIN_VB_W, MAX_VB_W);
+  const newH = newW * (BASE_VB.h / BASE_VB.w);
+  viewBox = { x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH };
+  setViewBox();
+}
+
+function clientToSvg(evt) {
+  const rect = document.getElementById('graphSvg').getBoundingClientRect();
+  const scaleX = viewBox.w / rect.width, scaleY = viewBox.h / rect.height;
+  return { x: viewBox.x + (evt.clientX - rect.left) * scaleX, y: viewBox.y + (evt.clientY - rect.top) * scaleY };
+}
+
+function positionsStorageKey() { return 'netsim-positions:' + currentTopoId; }
+
+function loadSavedPositions() {
+  try { return JSON.parse(localStorage.getItem(positionsStorageKey())) || {}; } catch (e) { return {}; }
+}
+
+function savePositions() {
+  try { localStorage.setItem(positionsStorageKey(), JSON.stringify(nodePositions)); } catch (e) { /* ignore */ }
+}
+
+/** Ensures every current router has a position (from local storage, or a fresh circular layout slot), then draws. */
+function renderGraph(highlightPath) {
+  currentHighlightPath = highlightPath || null;
+  if (!currentTopo || currentTopo.routers.length === 0) {
+    document.getElementById('graphContent').innerHTML = '';
+    return;
+  }
+  const saved = loadSavedPositions();
+  const cx = BASE_VB.w / 2, cy = BASE_VB.h / 2, radius = Math.min(190, 80 + currentTopo.routers.length * 7);
+  currentTopo.routers.forEach((r, idx) => {
+    if (nodePositions[r.id]) return; // already positioned from earlier in this session
+    if (saved[r.id]) { nodePositions[r.id] = saved[r.id]; return; }
+    const angle = (2 * Math.PI * idx) / currentTopo.routers.length - Math.PI / 2;
+    nodePositions[r.id] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  });
+  renderGraphContent();
+}
+
+/** Redraws using whatever is already in nodePositions — no layout recompute. Safe to call every drag frame. */
+function renderGraphContent() {
+  if (!currentTopo) { document.getElementById('graphContent').innerHTML = ''; return; }
+  const highlightPath = currentHighlightPath;
+  const pathSet = new Set();
+  if (highlightPath) {
+    for (let i = 0; i < highlightPath.length - 1; i++) {
+      pathSet.add(highlightPath[i] + '|' + highlightPath[i + 1]);
+      pathSet.add(highlightPath[i + 1] + '|' + highlightPath[i]);
+    }
+  }
+
+  let content = '';
+  currentTopo.links.forEach(l => {
+    const a = nodePositions[l.sourceId], b = nodePositions[l.targetId];
+    if (!a || !b) return;
+    const isPath = pathSet.has(l.sourceId + '|' + l.targetId);
+    const color = l.status !== 'UP' ? '#f87171' : (isPath ? '#38bdf8' : '#5c7089');
+    const width = isPath ? 4 : (l.status !== 'UP' ? 2 : 1.5);
+    const dash = l.status !== 'UP' ? 'stroke-dasharray="5,4"' : '';
+    content += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${color}" stroke-width="${width}" ${dash}/>`;
+    content += `<line data-link-id="${l.id}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="transparent" stroke-width="14" style="cursor:context-menu"/>`;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    content += `<text class="link-label" x="${mx}" y="${my - 4}">${l.latencyMs}ms</text>`;
+  });
+
+  currentTopo.routers.forEach(r => {
+    const p = nodePositions[r.id];
+    if (!p) return;
+    const isSel = r.id === selectedSource || r.id === selectedDest;
+    const fill = r.status !== 'UP' ? '#f87171' : (isSel ? '#38bdf8' : '#4ade80');
+    if (isSel) {
+      content += `<circle class="pulse-ring" cx="${p.x}" cy="${p.y}" r="18" fill="none" stroke="${fill}" style="pointer-events:none;"/>`;
+    }
+    content += `<circle data-node-id="${r.id}" cx="${p.x}" cy="${p.y}" r="18" fill="${fill}" fill-opacity="0.25" stroke="${fill}" stroke-width="2" style="cursor:grab;transition:fill 0.3s ease,stroke 0.3s ease;"/>`;
+    content += `<text class="node-label" x="${p.x}" y="${p.y + 4}">${r.label}</text>`;
+  });
+
+  document.getElementById('graphContent').innerHTML = content;
+}
+
+// ---------- Hop-by-hop packet animation ----------
+// Runs as a custom requestAnimationFrame loop (not a single SVG animateMotion) so each hop's
+// on-screen duration is proportional to that link's configured latency, and so a node can flash
+// exactly when the packet "arrives" — closer to what's actually being simulated than one constant-speed glide.
+let currentAnimToken = 0;
+
+function animatePacket(path) {
+  if (!path || path.length < 2) return;
+  const myToken = ++currentAnimToken;
+  const content = document.getElementById('graphContent');
+
+  const hopLatencies = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const link = currentTopo.links.find(l =>
+      (l.sourceId === path[i] && l.targetId === path[i + 1]) || (l.sourceId === path[i + 1] && l.targetId === path[i]));
+    hopLatencies.push(link ? Math.max(link.latencyMs, 0.1) : 1);
+  }
+  const totalLatency = hopLatencies.reduce((a, b) => a + b, 0) || 1;
+  const TOTAL_VISUAL_MS = 2200, MIN_SEG_MS = 260;
+  const durations = hopLatencies.map(l => Math.max(MIN_SEG_MS, (l / totalLatency) * TOTAL_VISUAL_MS));
+
+  const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  dot.setAttribute('r', '7');
+  dot.setAttribute('fill', '#fbbf24');
+  dot.style.filter = 'drop-shadow(0 0 8px #fbbf24)';
+  content.appendChild(dot);
+
+  let hopIndex = 0;
+  pulseNode(path[0]);
+
+  function nextHop() {
+    if (myToken !== currentAnimToken) return;
+    if (hopIndex >= path.length - 1) { dot.remove(); return; }
+    const a = nodePositions[path[hopIndex]], b = nodePositions[path[hopIndex + 1]];
+    if (!a || !b) { dot.remove(); return; }
+    const duration = durations[hopIndex];
+    const start = performance.now();
+
+    function frame(now) {
+      if (myToken !== currentAnimToken) return;
+      const t = Math.min(1, (now - start) / duration);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      dot.setAttribute('cx', a.x + (b.x - a.x) * eased);
+      dot.setAttribute('cy', a.y + (b.y - a.y) * eased);
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        pulseNode(path[hopIndex + 1]);
+        hopIndex++;
+        nextHop();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  nextHop();
+}
+
+function pulseNode(nodeId) {
+  const p = nodePositions[nodeId];
+  if (!p) return;
+  const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  ring.setAttribute('cx', p.x);
+  ring.setAttribute('cy', p.y);
+  ring.setAttribute('r', '18');
+  ring.setAttribute('fill', 'none');
+  ring.setAttribute('stroke', '#fbbf24');
+  ring.setAttribute('stroke-width', '3');
+  ring.style.animation = 'pulseRing 0.6s ease-out forwards';
+  document.getElementById('graphContent').appendChild(ring);
+  setTimeout(() => ring.remove(), 650);
+}
+
+function onNodeClick(routerId) {
+  if (!selectedSource || (selectedSource && selectedDest)) {
+    selectedSource = routerId;
+    selectedDest = null;
+  } else if (routerId !== selectedSource) {
+    selectedDest = routerId;
+  }
+  if (selectedSource) document.getElementById('simSource').value = selectedSource;
+  if (selectedDest) document.getElementById('simDest').value = selectedDest;
+  renderGraphContent();
+}
+
+function updateGraphSelection() {
+  selectedSource = document.getElementById('simSource').value;
+  selectedDest = document.getElementById('simDest').value;
+  renderGraphContent();
+}
+
+// --- pointer handling: pan on empty space, drag on a node, click (no movement) = select ---
+function initGraphInteraction() {
+  const svg = document.getElementById('graphSvg');
+
+  svg.addEventListener('mousedown', e => {
+    if (e.button !== 0) return; // left button only; right-click is handled by contextmenu
+    const nodeId = e.target.getAttribute && e.target.getAttribute('data-node-id');
+    dragState = { startClientX: e.clientX, startClientY: e.clientY, moved: false };
+    if (nodeId) {
+      dragState.mode = 'node';
+      dragState.nodeId = nodeId;
+    } else {
+      dragState.mode = 'pan';
+      dragState.startViewBox = { ...viewBox };
+      svg.classList.add('panning');
+    }
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (dragState.mode === 'none' || !dragState.mode) return;
+    const dx = e.clientX - dragState.startClientX, dy = e.clientY - dragState.startClientY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
+    if (!dragState.moved) return;
+
+    if (dragState.mode === 'pan') {
+      const rect = svg.getBoundingClientRect();
+      const scaleX = viewBox.w / rect.width, scaleY = viewBox.h / rect.height;
+      viewBox.x = dragState.startViewBox.x - dx * scaleX;
+      viewBox.y = dragState.startViewBox.y - dy * scaleY;
+      setViewBox();
+    } else if (dragState.mode === 'node') {
+      const pt = clientToSvg(e);
+      nodePositions[dragState.nodeId] = { x: pt.x, y: pt.y };
+      renderGraphContent();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (dragState.mode === 'node') {
+      if (dragState.moved) savePositions();
+      else onNodeClick(dragState.nodeId);
+    }
+    dragState = { mode: 'none' };
+    svg.classList.remove('panning');
+  });
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const pt = clientToSvg(e);
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    const newW = clamp(viewBox.w / factor, MIN_VB_W, MAX_VB_W);
+    const newH = newW * (BASE_VB.h / BASE_VB.w);
+    const ratioX = (pt.x - viewBox.x) / viewBox.w, ratioY = (pt.y - viewBox.y) / viewBox.h;
+    viewBox = { w: newW, h: newH, x: pt.x - ratioX * newW, y: pt.y - ratioY * newH };
+    setViewBox();
+  }, { passive: false });
+
+  svg.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const nodeId = e.target.getAttribute && e.target.getAttribute('data-node-id');
+    const linkId = e.target.getAttribute && e.target.getAttribute('data-link-id');
+    let items = [];
+    if (nodeId) {
+      const r = currentTopo.routers.find(r => r.id === nodeId);
+      if (!r) return;
+      items = [
+        { label: '→ Set as source', action: () => { selectedSource = nodeId; document.getElementById('simSource').value = nodeId; renderGraphContent(); } },
+        { label: '→ Set as destination', action: () => { selectedDest = nodeId; document.getElementById('simDest').value = nodeId; renderGraphContent(); } },
+        { label: r.status === 'UP' ? '⏻ Bring DOWN (fault-inject)' : '⏻ Bring UP', action: () => toggleRouter(nodeId, r.status) },
+        { label: '✕ Delete router', danger: true, action: () => deleteRouter(nodeId) }
+      ];
+    } else if (linkId) {
+      const l = currentTopo.links.find(l => l.id === linkId);
+      if (!l) return;
+      items = [
+        { label: l.status === 'UP' ? '⏻ Bring DOWN (fault-inject)' : '⏻ Bring UP', action: () => toggleLink(linkId, l.status) },
+        { label: '✕ Delete link', danger: true, action: () => deleteLink(linkId) }
+      ];
+    } else {
+      return;
+    }
+    showCtxMenu(e.clientX, e.clientY, items);
+  });
+}
+
+function showCtxMenu(x, y, items) {
+  const menu = document.getElementById('ctxMenu');
+  menu.innerHTML = items.map((it, i) => `<button ${it.danger ? 'class="danger-item"' : ''} data-idx="${i}">${it.label}</button>`).join('');
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.style.display = 'block';
+  menu._items = items;
+}
+
+function hideCtxMenu() { document.getElementById('ctxMenu').style.display = 'none'; }
+
+document.getElementById('ctxMenu').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const idx = parseInt(btn.getAttribute('data-idx'));
+  const items = document.getElementById('ctxMenu')._items;
+  hideCtxMenu();
+  if (items && items[idx]) items[idx].action();
+});
+window.addEventListener('click', e => { if (!e.target.closest('#ctxMenu')) hideCtxMenu(); });
+
+initGraphInteraction();
+setViewBox();
+
+// ---------- Topology / router / link CRUD ----------
+async function createTopology() {
+  const name = document.getElementById('newTopoName').value.trim();
+  if (!name) return;
+  try {
+    const t = await api('/topologies', { method: 'POST', body: JSON.stringify({ name }) });
+    document.getElementById('newTopoName').value = '';
+    currentTopoId = t.id;
+    await loadTopologies();
+    await selectTopology(t.id);
+    showToast(`Topology "${name}" created`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteTopology() {
+  if (!currentTopoId) return;
+  if (!confirm('Delete this topology and everything in it?')) return;
+  try {
+    await api(`/topologies/${currentTopoId}`, { method: 'DELETE' });
+    currentTopoId = null;
+    currentTopo = null;
+    await loadTopologies();
+    renderTopology();
+    renderGraph();
+    showToast('Topology deleted', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function exportTopology() {
+  if (!currentTopoId) return;
+  const data = await api(`/topologies/${currentTopoId}/export`);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${data.name}.json`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported JSON', 'success');
+}
+
+async function addRouter() {
+  const label = document.getElementById('newRouterLabel').value.trim();
+  if (!label || !currentTopoId) return;
+  try {
+    await api(`/topologies/${currentTopoId}/routers`, { method: 'POST', body: JSON.stringify({ label }) });
+    document.getElementById('newRouterLabel').value = '';
+    await selectTopology(currentTopoId);
+    showToast(`Router "${label}" added`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteRouter(routerId) {
+  const label = labelFor(routerId);
+  try {
+    await api(`/topologies/${currentTopoId}/routers/${routerId}`, { method: 'DELETE' });
+    await selectTopology(currentTopoId);
+    showToast(`Router "${label}" deleted`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function toggleRouter(routerId, currentStatus) {
+  const next = currentStatus === 'UP' ? 'DOWN' : 'UP';
+  try {
+    await api(`/topologies/${currentTopoId}/routers/${routerId}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+    await selectTopology(currentTopoId);
+    showToast(`${labelFor(routerId)} is now ${next}`, next === 'UP' ? 'success' : 'error');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function addLink() {
+  const sourceId = document.getElementById('linkSource').value;
+  const targetId = document.getElementById('linkTarget').value;
+  if (!sourceId || !targetId || sourceId === targetId) { showToast('Pick two different routers to link', 'error'); return; }
+  try {
+    await api(`/topologies/${currentTopoId}/links`, {
+      method: 'POST',
+      body: JSON.stringify({
+        sourceId, targetId,
+        bandwidthMbps: parseFloat(document.getElementById('linkBandwidth').value) || 100,
+        latencyMs: parseFloat(document.getElementById('linkLatency').value) || 5,
+        reliabilityPct: parseFloat(document.getElementById('linkReliability').value) || 100,
+        bidirectional: true
+      })
+    });
+    await selectTopology(currentTopoId);
+    showToast(`Link ${labelFor(sourceId)} ↔ ${labelFor(targetId)} added`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteLink(linkId) {
+  try {
+    await api(`/topologies/${currentTopoId}/links/${linkId}`, { method: 'DELETE' });
+    await selectTopology(currentTopoId);
+    showToast('Link deleted', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function toggleLink(linkId, currentStatus) {
+  const next = currentStatus === 'UP' ? 'DOWN' : 'UP';
+  try {
+    await api(`/topologies/${currentTopoId}/links/${linkId}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+    await selectTopology(currentTopoId);
+    showToast(`Link is now ${next}`, next === 'UP' ? 'success' : 'error');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ---------- Simulation ----------
+async function runSimulation() {
+  const sourceRouterId = document.getElementById('simSource').value;
+  const destRouterId = document.getElementById('simDest').value;
+  const algorithm = document.getElementById('simAlgorithm').value;
+  const resultBox = document.getElementById('simResult');
+  resultBox.innerHTML = '<span class="muted"><span class="spinner"></span>Running…</span>';
+
+  try {
+    const result = await api('/simulations/run', {
+      method: 'POST',
+      body: JSON.stringify({ topologyId: currentTopoId, sourceRouterId, destRouterId, algorithm })
+    });
+    const ok = result.status === 'DELIVERED';
+    resultBox.innerHTML = `
+      <div><span class="${ok ? 'ok' : 'fail'}">${result.status}</span> — run ${result.runId}</div>
+      <div>Path: ${result.path.map(labelFor).join(' → ')}</div>
+      <div>Latency: ${result.totalLatencyMs.toFixed(2)}ms · Hops: ${result.hopCount} · Loss: ${result.packetLossPct}%</div>
+    `;
+    document.getElementById('lastExplain').innerHTML = ok
+      ? `<b>${algorithm}</b> computed the cheapest-latency route from ${labelFor(sourceRouterId)} to ${labelFor(destRouterId)}
+         (${result.path.map(labelFor).join(' → ')}). One packet was sent along it, hop by hop — at each link the
+         simulator rolled the link's reliability % (all survived this time) and added latency + a little random jitter.
+         Total time simulated: ${result.totalLatencyMs.toFixed(2)}ms.`
+      : `The packet was <b>dropped</b> partway along ${result.path.map(labelFor).join(' → ')}. This happens when a link
+         is DOWN, or when the random reliability roll goes against the packet. Try again, or use "Batch simulate" to see
+         how often this route actually loses packets.`;
+    renderGraph(ok ? result.path : null);
+    if (ok) animatePacket(result.path);
+    subscribeToRun(result.runId);
+    loadHistory();
+  } catch (e) {
+    resultBox.innerHTML = `<span class="fail">Error: ${e.message}</span>`;
+  }
+}
+
+async function runBatch() {
+  const sourceRouterId = document.getElementById('simSource').value;
+  const destRouterId = document.getElementById('simDest').value;
+  const algorithm = document.getElementById('simAlgorithm').value;
+  const packetCount = parseInt(document.getElementById('batchCount').value) || 20;
+  const resultBox = document.getElementById('simResult');
+  resultBox.innerHTML = `<span class="muted"><span class="spinner"></span>Firing ${packetCount} packets…</span>`;
+  try {
+    const r = await api('/simulations/run-batch', {
+      method: 'POST',
+      body: JSON.stringify({ topologyId: currentTopoId, sourceRouterId, destRouterId, algorithm, packetCount })
+    });
+    resultBox.innerHTML = `
+      <div><b>${r.deliveredCount}/${r.packetCount}</b> delivered (${r.lossPct.toFixed(1)}% loss)</div>
+      <div>Latency avg/min/max: ${r.avgLatencyMs.toFixed(2)} / ${r.minLatencyMs.toFixed(2)} / ${r.maxLatencyMs.toFixed(2)} ms</div>
+      <div>Jitter (stddev): ${r.jitterMs.toFixed(2)} ms</div>
+      <div class="explain">Sending ${packetCount} packets on the same route reveals the real loss rate and latency spread —
+        a single run only ever shows you one random outcome.</div>
+    `;
+  } catch (e) {
+    resultBox.innerHTML = `<span class="fail">Error: ${e.message}</span>`;
+  }
+}
+
+async function analyzeTopology() {
+  const algorithm = document.getElementById('simAlgorithm').value;
+  const resultBox = document.getElementById('simResult');
+  resultBox.innerHTML = '<span class="muted"><span class="spinner"></span>Analyzing all pairs…</span>';
+  try {
+    const analysis = await api(`/topologies/${currentTopoId}/analyze?algorithm=${algorithm}`);
+    resultBox.innerHTML = `
+      <div><b>${analysis.pairsReachable} / ${analysis.pairsEvaluated}</b> router pairs can reach each other</div>
+      <div>Avg latency among reachable pairs: ${analysis.avgLatencyMsAmongReachable.toFixed(2)}ms</div>
+      <div class="explain">This ran a simulation between every pair of routers to check overall network health at a glance.</div>
+    `;
+  } catch (e) {
+    resultBox.innerHTML = `<span class="fail">Error: ${e.message}</span>`;
+  }
+}
+
+async function showRoutingTable() {
+  const algorithm = document.getElementById('simAlgorithm').value;
+  const sourceRouterId = document.getElementById('simSource').value;
+  const box = document.getElementById('routingTableBox');
+  if (!sourceRouterId) return;
+  box.innerHTML = '<span class="muted"><span class="spinner"></span>Computing…</span>';
+  try {
+    const analysis = await api(`/topologies/${currentTopoId}/analyze?algorithm=${algorithm}`);
+    const rows = analysis.pairs.filter(p => p.sourceRouterId === sourceRouterId);
+    if (rows.length === 0) {
+      box.innerHTML = '<p class="muted">No other routers to reach yet.</p>';
+      return;
+    }
+    box.innerHTML = `
+      <table>
+        <thead><tr><th>Destination</th><th>Status</th><th>Latency</th><th>Hops</th></tr></thead>
+        <tbody>
+          ${rows.map(p => `
+            <tr>
+              <td>${labelFor(p.destRouterId)}</td>
+              <td class="${p.status === 'DELIVERED' ? '' : 'fail'}">${p.status}</td>
+              <td>${p.status === 'DELIVERED' ? p.totalLatencyMs.toFixed(2) + 'ms' : '—'}</td>
+              <td>${p.status === 'DELIVERED' ? p.hopCount : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="explain">This is ${labelFor(sourceRouterId)}'s effective routing table under <b>${algorithm}</b> right now —
+        one row per reachable destination, with the cost <b>${algorithm}</b> computed to reach it. Toggle a link and
+        recompute to see entries change.</div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<span class="fail">Error: ${e.message}</span>`;
+  }
+}
+
+async function loadHistory() {
+  if (!currentTopoId) return;
+  try {
+    const page = await api(`/simulations?topologyId=${currentTopoId}&size=10`);
+    const rows = page.content || [];
+    document.getElementById('historyTable').innerHTML = rows.map(r => `
+      <tr><td>${r.algorithm}</td><td>${r.status}</td><td>${labelFor(r.sourceRouterId)}→${labelFor(r.destRouterId)}</td></tr>
+    `).join('') || '<tr><td colspan="3" class="muted">No runs yet</td></tr>';
+  } catch (e) { /* ignore */ }
+}
+
+// ---------- Live traffic ----------
+let trafficPollHandle = null;
+
+async function startTraffic() {
+  const algorithm = document.getElementById('simAlgorithm').value;
+  const intervalMs = parseInt(document.getElementById('trafficInterval').value) || 500;
+  try {
+    await api(`/topologies/${currentTopoId}/traffic/start`, { method: 'POST', body: JSON.stringify({ algorithm, intervalMs }) });
+    pollTraffic();
+    if (trafficPollHandle) clearInterval(trafficPollHandle);
+    trafficPollHandle = setInterval(pollTraffic, 1500);
+    showToast('Background traffic started', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function stopTraffic() {
+  try {
+    await api(`/topologies/${currentTopoId}/traffic/stop`, { method: 'POST' });
+    if (trafficPollHandle) { clearInterval(trafficPollHandle); trafficPollHandle = null; }
+    pollTraffic();
+    showToast('Background traffic stopped', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function pollTraffic() {
+  if (!currentTopoId) return;
+  try {
+    const s = await api(`/topologies/${currentTopoId}/traffic/stats`);
+    const box = document.getElementById('trafficStats');
+    if (!s.running && s.packetsSent === 0) {
+      box.innerHTML = 'Not running.';
+    } else {
+      box.innerHTML = `${s.running ? '🟢 running' : '⚪ stopped'} — sent ${s.packetsSent}, delivered ${s.delivered}, dropped ${s.dropped}, avg latency ${s.avgLatencyMs.toFixed(2)}ms`;
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// ---------- Snapshots ----------
+async function captureSnapshot() {
+  if (!currentTopoId) return;
+  try {
+    await api(`/topologies/${currentTopoId}/snapshots`, { method: 'POST' });
+    await loadSnapshots();
+    showToast('Snapshot captured', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function loadSnapshots() {
+  if (!currentTopoId) return;
+  const rows = await api(`/topologies/${currentTopoId}/snapshots`);
+  document.getElementById('snapshotTable').innerHTML = rows.map(s => `
+    <tr><td>${new Date(s.capturedAt).toLocaleTimeString()}</td><td>${s.routerCount}</td><td>${s.linkCount}</td><td>${s.avgLinkLatencyMs.toFixed(2)}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="muted">No snapshots yet</td></tr>';
+}
+
+// ---------- Live event stream ----------
+function subscribeToRun(runId) {
+  const log = document.getElementById('eventLog');
+  log.innerHTML = '';
+  if (!stompClient) {
+    const socket = new SockJS('/ws/simulations');
+    stompClient = Stomp.over(socket);
+    stompClient.debug = null;
+    stompClient.connect({}, () => {
+      stompClient.subscribe(`/topic/simulations/${runId}`, msg => appendEvent(JSON.parse(msg.body)));
+    });
+  } else {
+    stompClient.subscribe(`/topic/simulations/${runId}`, msg => appendEvent(JSON.parse(msg.body)));
+  }
+}
+
+const EVENT_HINT = {
+  ROUTE_RECOMPUTED: 'The routing algorithm just calculated the path to use.',
+  HOP_REACHED: 'The packet successfully crossed one link and arrived at this router.',
+  PACKET_DROPPED: 'The packet was lost here — either the link was down or the reliability roll failed.',
+  LINK_DOWN: 'The next link on the path is down, so the packet cannot continue.',
+  DELIVERED: 'The packet reached its destination.'
+};
+
+function appendEvent(evt) {
+  const log = document.getElementById('eventLog');
+  const div = document.createElement('div');
+  const hint = EVENT_HINT[evt.type] || '';
+  div.title = hint;
+  div.textContent = `[${evt.simulatedTimeMs.toFixed(1)}ms] ${evt.type} @ ${labelFor(evt.routerId) || evt.routerId}${evt.detail ? ' — ' + evt.detail : ''}`;
+  log.prepend(div);
+}
+
+// ---------- Boot ----------
+renderAlgoExplain();
+loadTopologies();
+try {
+  if (!localStorage.getItem('netsim-tour-seen')) {
+    document.getElementById('tourModal').classList.add('open');
+  }
+} catch (e) {}
+</script>
+</body>
+</html>

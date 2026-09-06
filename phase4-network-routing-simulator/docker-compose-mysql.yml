@@ -1,0 +1,28 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/netsim
+      SPRING_DATASOURCE_USERNAME: netsim
+      SPRING_DATASOURCE_PASSWORD: netsim
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: netsim
+      MYSQL_USER: netsim
+      MYSQL_PASSWORD: netsim
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - netsim-mysql-data:/var/lib/mysql
+
+volumes:
+  netsim-mysql-data:

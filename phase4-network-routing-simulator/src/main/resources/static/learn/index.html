@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learn — Network Routing Simulator</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #263449; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0c4a6e;
+    --good: #4ade80; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+  main > p { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px;
+    text-decoration: none; color: var(--text); display: block; animation: fadeInUp 0.35s ease both;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 10px 24px rgba(0,0,0,0.35); }
+  .card:nth-child(2) { animation-delay: 0.05s; }
+  .card:nth-child(3) { animation-delay: 0.1s; }
+  .card h2 { font-size: 16px; margin: 6px 0 8px; }
+  .card p { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+    background: rgba(56,189,248,0.15); color: var(--accent);
+  }
+  .badge.mid { background: rgba(251,191,36,0.15); color: var(--warn); }
+  .card.placeholder {
+    border-style: dashed; opacity: 0.55; cursor: default; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Network Routing Simulator — Learn</h1>
+  <a href="/">← Back to simulator</a>
+</header>
+
+<main>
+  <p>Deep, interactive lessons on networking concepts — each one includes a working demonstration you can actually try, not just static text.</p>
+  <div class="grid">
+    <a class="card" href="/learn/longest-prefix-match.html">
+      <span class="badge mid">Intermediate</span>
+      <h2>Longest Prefix Match</h2>
+      <p>How a router picks the single best route when several routes technically match — with a live calculator and bit-level breakdown.</p>
+    </a>
+    <a class="card" href="/learn/dijkstra-algorithm.html">
+      <span class="badge">Beginner–Intermediate</span>
+      <h2>Dijkstra's Algorithm</h2>
+      <p>Step through the exact shortest-path algorithm the simulator itself uses, one iteration at a time, on a worked example graph.</p>
+    </a>
+    <a class="card" href="/learn/bellman-ford.html">
+      <span class="badge mid">Intermediate</span>
+      <h2>Bellman-Ford Algorithm</h2>
+      <p>The classic negative-weight-tolerant alternative to Dijkstra — round-by-round edge relaxation, with a live demo of exactly why it matters.</p>
+    </a>
+    <a class="card" href="/learn/distance-vector.html">
+      <span class="badge">Beginner–Intermediate</span>
+      <h2>Distance Vector Routing</h2>
+      <p>How real routers converge on shortest paths using only neighbor gossip — no router ever sees the whole network.</p>
+    </a>
+    <div class="card placeholder">
+      <span class="badge">Coming soon</span>
+      <h2>More lessons</h2>
+      <p>Subnetting, TCP handshakes, and more are planned using this same template.</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>

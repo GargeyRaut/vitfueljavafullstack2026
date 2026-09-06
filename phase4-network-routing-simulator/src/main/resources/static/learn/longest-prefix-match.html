@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longest Prefix Match — Network Routing Simulator</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #263449; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0c4a6e;
+    --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0;
+    background: var(--bg); z-index: 5;
+  }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(74,222,128,0.15); color: var(--good); margin-right: 8px;
+  }
+  .badge.mid { background: rgba(251,191,36,0.15); color: var(--warn); }
+  h2.section {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent);
+    border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 34px 0 14px;
+  }
+  h1.title { font-size: 26px; margin: 6px 0 4px; }
+  .lede { color: var(--muted); font-size: 14.5px; margin-bottom: 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 4px; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  tr.winner td { background: rgba(56,189,248,0.12); font-weight: 600; }
+  input, button, select {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 7px 9px; font-size: 13px;
+  }
+  button { cursor: pointer; background: var(--accent); color: #06202f; font-weight: 600; border: none; }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .row > input { flex: 1; min-width: 160px; }
+  .binrow { display: flex; gap: 2px; font-family: ui-monospace, monospace; font-size: 13px; align-items: center; }
+  .binrow .byte { display: flex; }
+  .binrow .bit { width: 13px; text-align: center; }
+  .binrow .bit.match { color: var(--good); font-weight: 700; }
+  .binrow .bit.mismatch { color: var(--bad); }
+  .binrow .label { width: 130px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+  .error { color: var(--bad); font-size: 13px; margin-top: 6px; }
+  .concept-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .concept-chip {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; color: var(--muted); max-width: 260px;
+  }
+  .concept-chip b { color: var(--text); }
+  .quiz-q { margin-bottom: 18px; }
+  .quiz-q .qtext { font-weight: 600; margin-bottom: 6px; }
+  .quiz-q label { display: block; font-size: 13.5px; margin-bottom: 4px; cursor: pointer; }
+  .quiz-feedback { font-size: 13px; margin-top: 6px; padding: 8px 10px; border-radius: 6px; display: none; }
+  .quiz-feedback.correct { background: rgba(74,222,128,0.12); color: var(--good); display: block; }
+  .quiz-feedback.incorrect { background: rgba(248,113,113,0.12); color: var(--bad); display: block; }
+  .step { display: flex; gap: 12px; margin-bottom: 10px; }
+  .step .num {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .navrow { display: flex; justify-content: space-between; margin: 40px 0 20px; gap: 12px; }
+  .navrow button { flex: 1; text-align: left; padding: 12px 14px; }
+  .mistake { border-left: 3px solid var(--bad); padding: 8px 12px; background: var(--panel-2); border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Network Routing Simulator — Learn</h1>
+  <div>
+    <a href="/learn/index.html" style="margin-right:16px;">📚 Learn hub</a>
+    <a href="/">← Back to simulator</a>
+  </div>
+</header>
+
+<main>
+  <span class="badge">Level 4 — Routing</span><span class="badge mid">Difficulty: Intermediate</span>
+  <h1 class="title">Longest Prefix Match</h1>
+  <p class="lede">How a router picks the single best route when several routes could technically apply.</p>
+
+  <h2 class="section">1 · Overview</h2>
+  <p>
+    A router's routing table often contains several entries that all technically match a given
+    destination address — a broad one covering a whole provider network, and narrower ones
+    covering specific subnets inside it. <b>Longest Prefix Match (LPM)</b> is the rule every IP
+    router uses to pick exactly one of them: among all matching routes, use the one with the
+    <b>most specific (longest) prefix</b>.
+  </p>
+
+  <h2 class="section">2 · Why it exists</h2>
+  <p>
+    Without a tie-breaking rule, a router with both <code>10.0.0.0/8</code> and
+    <code>10.1.2.0/24</code> in its table would have no defined way to choose between them for a
+    packet addressed to <code>10.1.2.5</code> — and different routers guessing differently would
+    make the network unpredictable. LPM gives every router the same, deterministic answer:
+    prefer specificity.
+  </p>
+
+  <h2 class="section">3 · Real-world analogy</h2>
+  <p>
+    It's like mail addressed with both a country and a street. If one rule says "anything for
+    Japan goes to the Tokyo sorting office" and a more specific rule says "anything for this
+    exact street goes directly to this local post office", the local post office — the more
+    specific rule — wins, even though the country-wide rule also technically applies.
+  </p>
+
+  <h2 class="section">4 · Technical explanation</h2>
+  <p>
+    Every route in a routing table is a <code>network/prefix-length</code> pair, e.g.
+    <code>192.168.1.0/24</code>. To test whether a destination IP matches a route, the router:
+  </p>
+  <div class="step"><div class="num">1</div><div>Converts the destination IP and the route's network address into 32-bit binary.</div></div>
+  <div class="step"><div class="num">2</div><div>Builds a <b>mask</b> from the prefix length — a run of that many 1-bits followed by 0-bits.</div></div>
+  <div class="step"><div class="num">3</div><div>Applies the mask to both the destination IP and the route's network address (bitwise AND).</div></div>
+  <div class="step"><div class="num">4</div><div>If the results are equal, the route matches. Among <i>all</i> matching routes, the one with the largest prefix length (the longest run of 1-bits — the most specific) is selected.</div></div>
+
+  <h2 class="section">5 · Interactive demonstration</h2>
+  <div class="panel">
+    <p style="margin-top:0;font-size:13px;color:var(--muted);">
+      Edit the routing table below (or use the defaults), enter a destination IP, and see exactly
+      which route wins and why.
+    </p>
+    <div class="row">
+      <input id="newRoute" placeholder="e.g. 192.168.1.128/25" class="mono">
+      <button onclick="addRoute()">+ Add route</button>
+    </div>
+    <table>
+      <thead><tr><th>Route</th><th>Prefix length</th><th></th></tr></thead>
+      <tbody id="routeTable"></tbody>
+    </table>
+    <div class="row" style="margin-top:14px;">
+      <input id="destIp" class="mono" value="192.168.1.130" placeholder="Destination IP, e.g. 192.168.1.130">
+      <button onclick="findRoute()">Find matching route</button>
+    </div>
+    <div id="lpmError" class="error"></div>
+    <div id="lpmResult"></div>
+  </div>
+
+  <h2 class="section">6 · What happens internally (bit-level)</h2>
+  <div class="panel">
+    <p style="margin-top:0;font-size:13px;color:var(--muted);">Run the demo above — the binary comparison for the winning route appears here.</p>
+    <div id="binaryBreakdown" class="mono"></div>
+  </div>
+
+  <h2 class="section">7 · Step-by-step worked example</h2>
+  <p>Using the default table above and destination <code>192.168.1.130</code>:</p>
+  <div class="step"><div class="num">1</div><div><code>0.0.0.0/0</code> — matches everything (0 bits required). ✅ Match, prefix length 0.</div></div>
+  <div class="step"><div class="num">2</div><div><code>192.168.0.0/16</code> — first 16 bits of <code>192.168.1.130</code> are <code>192.168</code>. ✅ Match, prefix length 16.</div></div>
+  <div class="step"><div class="num">3</div><div><code>192.168.1.0/24</code> — first 24 bits are <code>192.168.1</code>. ✅ Match, prefix length 24.</div></div>
+  <div class="step"><div class="num">4</div><div><code>192.168.1.128/25</code> — first 25 bits cover <code>192.168.1.128–255</code>, and 130 falls in that range. ✅ Match, prefix length 25 — <b>the winner</b>, since 25 is the longest of all matching prefixes.</div></div>
+
+  <h2 class="section">8 · Common mistakes</h2>
+  <div class="mistake"><b>Assuming the first matching route wins.</b> Real routers don't stop at the first match in table order — they evaluate all entries and pick the longest prefix, regardless of where it sits in the table.</div>
+  <div class="mistake"><b>Confusing prefix length with "how big the network is".</b> A longer prefix (like /28) covers <i>fewer</i> addresses than a shorter one (like /16) — "longer" refers to more matching bits required, i.e. more specific, not "bigger".</div>
+  <div class="mistake"><b>Forgetting the default route always matches.</b> <code>0.0.0.0/0</code> matches every address with zero bits of comparison — it's a safety net, and it always loses to any more specific route that also matches.</div>
+
+  <h2 class="section">9 · Practical scenario</h2>
+  <p>
+    A company's router has a route to its whole ISP-assigned block (<code>203.0.113.0/24</code>)
+    pointing out to the internet, and a second, more specific route to its own internal server
+    subnet (<code>203.0.113.128/28</code>) pointing to an internal switch. Any packet addressed
+    inside <code>.128–.143</code> matches both routes — LPM ensures it's correctly sent to the
+    internal switch instead of uselessly being routed out to the internet and back.
+  </p>
+
+  <h2 class="section">10 · Mini quiz</h2>
+  <div class="panel" id="quiz"></div>
+
+  <h2 class="section">11 · Related concepts</h2>
+  <div class="concept-list">
+    <div class="concept-chip"><b>Static routing</b> — manually configured routes, of which LPM decides which one applies.</div>
+    <div class="concept-chip"><b>Default route</b> — the /0 catch-all that always loses to a more specific match.</div>
+    <div class="concept-chip"><b>CIDR / subnetting</b> — the addressing scheme that makes variable-length prefixes possible.</div>
+    <div class="concept-chip"><b>Routing tables</b> — the structure LPM operates over.</div>
+  </div>
+
+  <div class="navrow">
+    <button class="secondary" disabled>◀ Previous lesson (this is the first)</button>
+    <button onclick="location.href='/learn/dijkstra-algorithm.html'">Next: Dijkstra's Algorithm ▶</button>
+  </div>
+</main>
+
+<script>
+let routes = [
+  { cidr: '0.0.0.0/0' },
+  { cidr: '192.168.0.0/16' },
+  { cidr: '192.168.1.0/24' },
+  { cidr: '192.168.1.128/25' }
+];
+
+function ipToInt(ip) {
+  const parts = ip.trim().split('.');
+  if (parts.length !== 4) throw new Error(`"${ip}" is not a valid IPv4 address`);
+  let n = 0;
+  for (const p of parts) {
+    const v = Number(p);
+    if (!Number.isInteger(v) || v < 0 || v > 255) throw new Error(`"${ip}" is not a valid IPv4 address`);
+    n = (n * 256) + v;
+  }
+  return n >>> 0;
+}
+
+function intToBinary(n) {
+  return (n >>> 0).toString(2).padStart(32, '0');
+}
+
+function maskFromPrefix(prefix) {
+  if (prefix === 0) return 0;
+  return (0xFFFFFFFF << (32 - prefix)) >>> 0;
+}
+
+function parseCidr(cidr) {
+  const [ip, prefixStr] = cidr.trim().split('/');
+  const prefix = Number(prefixStr);
+  if (!ip || prefixStr === undefined || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) {
+    throw new Error(`"${cidr}" is not a valid network/prefix (expected e.g. 192.168.1.0/24)`);
+  }
+  const mask = maskFromPrefix(prefix);
+  const network = (ipToInt(ip) & mask) >>> 0;
+  return { cidr, ip, prefix, mask, network };
+}
+
+function renderRouteTable() {
+  document.getElementById('routeTable').innerHTML = routes.map((r, i) => `
+    <tr>
+      <td class="mono">${r.cidr}</td>
+      <td>${r.cidr.split('/')[1]}</td>
+      <td><button class="secondary" style="padding:3px 8px;" onclick="removeRoute(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function addRoute() {
+  const val = document.getElementById('newRoute').value.trim();
+  if (!val) return;
+  try {
+    parseCidr(val); // validate
+    routes.push({ cidr: val });
+    document.getElementById('newRoute').value = '';
+    renderRouteTable();
+  } catch (e) {
+    document.getElementById('lpmError').textContent = e.message;
+  }
+}
+
+function removeRoute(i) {
+  routes.splice(i, 1);
+  renderRouteTable();
+}
+
+function findRoute() {
+  const errorBox = document.getElementById('lpmError');
+  const resultBox = document.getElementById('lpmResult');
+  errorBox.textContent = '';
+  resultBox.innerHTML = '';
+  document.getElementById('binaryBreakdown').innerHTML = '';
+
+  let destInt;
+  try {
+    destInt = ipToInt(document.getElementById('destIp').value);
+  } catch (e) {
+    errorBox.textContent = e.message;
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = routes.map(r => parseCidr(r.cidr));
+  } catch (e) {
+    errorBox.textContent = e.message;
+    return;
+  }
+
+  const evaluated = parsed.map(r => ({ ...r, matches: ((destInt & r.mask) >>> 0) === r.network }));
+  const matching = evaluated.filter(r => r.matches);
+
+  if (matching.length === 0) {
+    resultBox.innerHTML = '<p style="color:var(--bad);">No route matches this destination — in a real router this packet would be unreachable/dropped.</p>';
+    return;
+  }
+
+  const winner = matching.reduce((best, r) => (r.prefix > best.prefix ? r : best), matching[0]);
+
+  resultBox.innerHTML = `
+    <table>
+      <thead><tr><th>Route</th><th>Prefix</th><th>Matches?</th></tr></thead>
+      <tbody>
+        ${evaluated.map(r => `
+          <tr class="${r.cidr === winner.cidr ? 'winner' : ''}">
+            <td class="mono">${r.cidr}</td>
+            <td>${r.prefix}</td>
+            <td>${r.matches ? '✅ yes' + (r.cidr === winner.cidr ? ' — WINNER' : '') : '— no'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--muted);">
+      <b>${winner.cidr}</b> wins because it's the longest prefix (/${winner.prefix}) among all routes that
+      matched — every other matching route was less specific.
+    </p>
+  `;
+
+  renderBinaryBreakdown(destInt, winner);
+}
+
+function renderBinaryBreakdown(destInt, winner) {
+  const destBits = intToBinary(destInt);
+  const netBits = intToBinary(winner.network);
+  const groupBits = bits => bits.match(/.{1,8}/g).join(' ');
+
+  let bitsHtml = '';
+  for (let i = 0; i < 32; i++) {
+    if (i > 0 && i % 8 === 0) bitsHtml += ' ';
+    const inPrefix = i < winner.prefix;
+    const cls = inPrefix ? (destBits[i] === netBits[i] ? 'match' : 'mismatch') : '';
+    bitsHtml += `<span class="bit ${cls}">${destBits[i]}</span>`;
+  }
+  let netHtml = '';
+  for (let i = 0; i < 32; i++) {
+    if (i > 0 && i % 8 === 0) netHtml += ' ';
+    const inPrefix = i < winner.prefix;
+    const cls = inPrefix ? (destBits[i] === netBits[i] ? 'match' : 'mismatch') : '';
+    netHtml += `<span class="bit ${cls}">${netBits[i]}</span>`;
+  }
+
+  document.getElementById('binaryBreakdown').innerHTML = `
+    <div class="binrow"><span class="label">Destination IP</span><span class="byte">${bitsHtml}</span></div>
+    <div class="binrow"><span class="label">${winner.cidr}</span><span class="byte">${netHtml}</span></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+      Green = the first ${winner.prefix} bits, which must (and do) match for this to be a valid route. Bits after
+      that point aren't compared at all — that's exactly what "prefix length" means.
+    </p>
+  `;
+}
+
+// ---------- Mini quiz ----------
+const QUIZ = [
+  {
+    q: 'A router has routes 10.0.0.0/8 and 10.5.0.0/16, both matching a packet\'s destination. Which one is used?',
+    options: ['10.0.0.0/8, because it was configured first', '10.5.0.0/16, because it has the longer prefix', 'Both are used, load-balanced', 'Neither — this is a routing loop'],
+    correct: 1,
+    explain: 'Longest Prefix Match always prefers the more specific (longer prefix) route among all matches, regardless of configuration order.'
+  },
+  {
+    q: 'What does the default route 0.0.0.0/0 mean?',
+    options: ['It matches no addresses', 'It matches only 0.0.0.0 exactly', 'It matches every possible address, with 0 bits required to match', 'It disables routing'],
+    correct: 2,
+    explain: 'A /0 prefix means zero bits need to match, so every address satisfies it — it\'s the catch-all, and it always loses to any more specific route.'
+  },
+  {
+    q: 'Route A is /24 and Route B is /28, and both match a destination. Which is more specific?',
+    options: ['Route A (/24)', 'Route B (/28)', 'They are equally specific', 'Cannot be determined'],
+    correct: 1,
+    explain: 'A higher prefix length means more bits must match, which describes a smaller, more specific set of addresses — so /28 is more specific than /24.'
+  }
+];
+
+function renderQuiz() {
+  document.getElementById('quiz').innerHTML = QUIZ.map((item, qi) => `
+    <div class="quiz-q">
+      <div class="qtext">${qi + 1}. ${item.q}</div>
+      ${item.options.map((opt, oi) => `
+        <label><input type="radio" name="q${qi}" value="${oi}"> ${opt}</label>
+      `).join('')}
+      <button class="secondary" style="margin-top:6px;" onclick="checkQuiz(${qi})">Check answer</button>
+      <div class="quiz-feedback" id="feedback${qi}"></div>
+    </div>
+  `).join('');
+}
+
+function checkQuiz(qi) {
+  const selected = document.querySelector(`input[name="q${qi}"]:checked`);
+  const feedback = document.getElementById('feedback' + qi);
+  if (!selected) { feedback.className = 'quiz-feedback incorrect'; feedback.textContent = 'Pick an answer first.'; return; }
+  const correct = Number(selected.value) === QUIZ[qi].correct;
+  feedback.className = 'quiz-feedback ' + (correct ? 'correct' : 'incorrect');
+  feedback.textContent = (correct ? '✓ Correct. ' : '✗ Not quite. ') + QUIZ[qi].explain;
+}
+
+renderRouteTable();
+renderQuiz();
+</script>
+</body>
+</html>

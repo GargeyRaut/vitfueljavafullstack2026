@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bellman-Ford Algorithm — Network Routing Simulator</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #263449; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0c4a6e;
+    --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(251,191,36,0.15); color: var(--warn); margin-right: 8px; }
+  h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 34px 0 14px; }
+  h1.title { font-size: 26px; margin: 6px 0 4px; }
+  .lede { color: var(--muted); font-size: 14.5px; margin-bottom: 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 4px; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  button { cursor: pointer; background: var(--accent); color: #06202f; font-weight: 600; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; margin-right: 8px; margin-top: 6px; }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #bfSvg { width: 100%; height: 320px; background: #182436; border-radius: 8px; }
+  .node-label { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .edge-label { fill: var(--muted); font-size: 10.5px; text-anchor: middle; pointer-events: none; }
+  .edge-label.neg { fill: var(--warn); font-weight: 700; }
+  #stepLog { max-height: 160px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  #stepLog div { margin-bottom: 4px; color: var(--muted); }
+  #stepLog div.changed { color: var(--good); font-weight: 600; }
+  #stepLog div.done { color: var(--warn); font-weight: 700; }
+  .concept-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .concept-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; color: var(--muted); max-width: 260px; }
+  .concept-chip b { color: var(--text); }
+  .quiz-q { margin-bottom: 18px; }
+  .quiz-q .qtext { font-weight: 600; margin-bottom: 6px; }
+  .quiz-q label { display: block; font-size: 13.5px; margin-bottom: 4px; cursor: pointer; }
+  .quiz-feedback { font-size: 13px; margin-top: 6px; padding: 8px 10px; border-radius: 6px; display: none; }
+  .quiz-feedback.correct { background: rgba(74,222,128,0.12); color: var(--good); display: block; }
+  .quiz-feedback.incorrect { background: rgba(248,113,113,0.12); color: var(--bad); display: block; }
+  .step { display: flex; gap: 12px; margin-bottom: 10px; }
+  .step .num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .navrow { display: flex; justify-content: space-between; margin: 40px 0 20px; gap: 12px; }
+  .navrow button { flex: 1; text-align: left; padding: 12px 14px; }
+  .mistake { border-left: 3px solid var(--bad); padding: 8px 12px; background: var(--panel-2); border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Network Routing Simulator — Learn</h1>
+  <div><a href="/learn/index.html" style="margin-right:16px;">📚 Learn hub</a><a href="/">← Back to simulator</a></div>
+</header>
+
+<main>
+  <span class="badge">Level 4 — Routing</span>
+  <h1 class="title">Bellman-Ford Algorithm</h1>
+  <p class="lede">The routing algorithm that trades some of Dijkstra's speed for the ability to handle negative-weight edges.</p>
+
+  <h2 class="section">1 · Overview</h2>
+  <p>
+    Bellman-Ford also finds shortest paths from a start node to every other node, but instead of
+    greedily visiting nodes in distance order, it takes a blunter approach: relax <b>every edge in
+    the graph</b>, repeat that up to <code>(number of nodes − 1)</code> times, and stop early if a
+    full pass makes no improvements. It's slower than Dijkstra, but it doesn't rely on always
+    picking the "closest" node next — which is exactly what makes it work with negative weights.
+  </p>
+
+  <h2 class="section">2 · Why it exists</h2>
+  <p>
+    Dijkstra's greedy strategy silently breaks if any edge weight can be negative — a "closest"
+    node might not actually be closest once a later, cheaper (negative) edge is discovered.
+    Bellman-Ford makes no such assumption: by blindly relaxing every edge over and over, it
+    eventually finds the true shortest distances regardless of weight sign (as long as there's no
+    negative cycle, which would make "shortest path" undefined in the first place).
+  </p>
+
+  <h2 class="section">3 · Real-world analogy</h2>
+  <p>
+    Imagine a rumor about the fastest fare between two cities. Instead of trusting the map's most
+    "obviously cheap" route first (Dijkstra's approach), Bellman-Ford asks <i>every</i> travel
+    agent in the whole network, one round at a time: "given what you knew before, has anyone found
+    you a better deal?" After enough rounds of everyone comparing notes, the rumor settles on the
+    true cheapest fare everywhere — even if some agent only became useful because of a
+    surprising, deeply-discounted (negative-cost) leg.
+  </p>
+
+  <h2 class="section">4 · Technical explanation</h2>
+  <div class="step"><div class="num">1</div><div>Set distance to the start node = 0, every other node = infinity.</div></div>
+  <div class="step"><div class="num">2</div><div>Repeat up to <code>|V| − 1</code> times: go through <b>every edge</b> in the graph, and relax it (if going through the edge's source gives a shorter path to its target, update).</div></div>
+  <div class="step"><div class="num">3</div><div>If an entire pass makes no changes, distances have already converged — stop early.</div></div>
+  <div class="step"><div class="num">4</div><div>(A further optional pass can detect negative-weight cycles: if anything can still improve after <code>|V| − 1</code> rounds, no shortest path is well-defined.)</div></div>
+
+  <h2 class="section">5 · Interactive demonstration</h2>
+  <div class="panel">
+    <p style="margin-top:0;font-size:13px;color:var(--muted);">
+      This is a classic textbook example with one negative edge (<span style="color:var(--warn);font-weight:700;">orange</span>),
+      to show exactly why Dijkstra can't be used here. Click <b>Run round</b> to relax every edge
+      once per click, starting from <b>A</b>. Blue edges show the current shortest-path tree.
+    </p>
+    <svg id="bfSvg" viewBox="0 0 480 320"></svg>
+    <div>
+      <button id="stepBtn" onclick="stepRound()">▶ Run round</button>
+      <button class="secondary" onclick="resetBF()">↺ Reset</button>
+    </div>
+    <table>
+      <thead><tr><th>Node</th><th>Distance from A</th><th>Via</th></tr></thead>
+      <tbody id="distTable"></tbody>
+    </table>
+    <div id="stepLog"></div>
+  </div>
+
+  <h2 class="section">6 · Step-by-step worked example (narrated)</h2>
+  <p>
+    Unlike Dijkstra, the order edges are relaxed doesn't change the final answer — only how many
+    rounds it takes to fully settle. Running the demo above to completion always converges to the
+    same result: <code>A=0, B=2, C=4, D=7, E=-2</code>. Notice E's distance is
+    <b>negative</b> — something Dijkstra's algorithm can never produce, and would in fact handle
+    incorrectly if you tried.
+  </p>
+  <div class="step"><div class="num">1</div><div>Round 1 relaxes the direct edges out of A, and whatever those unlock — several distances drop from infinity to a first estimate.</div></div>
+  <div class="step"><div class="num">2</div><div>Round 2 catches improvements that depend on round 1's new estimates — notably, the negative edge <code>B→E (-4)</code> makes E cheaper than its first estimate.</div></div>
+  <div class="step"><div class="num">3</div><div>Further rounds keep propagating any remaining improvements until a full round changes nothing.</div></div>
+
+  <h2 class="section">7 · Common mistakes</h2>
+  <div class="mistake"><b>Using Dijkstra instead, "because it's faster".</b> Dijkstra is faster, but silently gives <i>wrong</i> answers the moment any edge is negative — there's no warning, it just computes the wrong shortest paths.</div>
+  <div class="mistake"><b>Forgetting the negative-cycle case.</b> If a cycle's total weight is negative, "shortest path" has no lower bound (you could loop forever getting cheaper) — Bellman-Ford is also the standard way to detect that this has happened.</div>
+  <div class="mistake"><b>Assuming more rounds always find more improvements.</b> Once a full round changes nothing, the algorithm has converged — running more rounds afterward can never improve anything further (in a graph with no negative cycle).</div>
+
+  <h2 class="section">8 · Practical scenario</h2>
+  <p>
+    This simulator's own <code>bellman-ford</code> option uses non-negative link latencies (like
+    Dijkstra) — real network hardware doesn't have "negative time" links — so on any topology you
+    build here, both algorithms will always agree on the shortest path. Bellman-Ford's real
+    practical niche is elsewhere: distributed distance-vector protocols like RIP are built on
+    essentially the same "relax repeatedly" idea, just spread across many routers each relaxing
+    their own local edges — which is exactly what the next lesson covers.
+  </p>
+
+  <h2 class="section">9 · Mini quiz</h2>
+  <div class="panel" id="quiz"></div>
+
+  <h2 class="section">10 · Related concepts</h2>
+  <div class="concept-list">
+    <div class="concept-chip"><b>Dijkstra's algorithm</b> — faster, but breaks with negative weights.</div>
+    <div class="concept-chip"><b>Negative cycle</b> — a loop with total negative weight, which breaks the very idea of "shortest path".</div>
+    <div class="concept-chip"><b>Distance vector routing</b> — a distributed version of the same relax-repeatedly idea.</div>
+  </div>
+
+  <div class="navrow">
+    <button class="secondary" onclick="location.href='/learn/dijkstra-algorithm.html'">◀ Previous: Dijkstra's Algorithm</button>
+    <button onclick="location.href='/learn/distance-vector.html'">Next: Distance Vector Routing ▶</button>
+  </div>
+</main>
+
+<script>
+const NODES = { A: { x: 70, y: 70 }, B: { x: 390, y: 70 }, C: { x: 390, y: 250 }, D: { x: 230, y: 160 }, E: { x: 70, y: 250 } };
+// Directed edges: [from, to, weight] — the classic CLRS Bellman-Ford example.
+const EDGES = [
+  ['A', 'B', 6], ['A', 'D', 7],
+  ['B', 'C', 5], ['B', 'D', 8], ['B', 'E', -4],
+  ['C', 'B', -2],
+  ['D', 'C', -3], ['D', 'E', 9],
+  ['E', 'C', 7], ['E', 'A', 2]
+];
+const START = 'A';
+
+let dist, prev, round, changedLastRound;
+
+function resetBF() {
+  dist = {}; prev = {};
+  Object.keys(NODES).forEach(id => dist[id] = id === START ? 0 : Infinity);
+  round = 0; changedLastRound = true;
+  document.getElementById('stepLog').innerHTML = '';
+  document.getElementById('stepBtn').disabled = false;
+  render();
+}
+
+function stepRound() {
+  const maxRounds = Object.keys(NODES).length - 1;
+  if (!changedLastRound || round >= maxRounds) return;
+  round++;
+  let changed = false;
+  const notes = [];
+  EDGES.forEach(([u, v, w]) => {
+    if (dist[u] === Infinity) return;
+    const candidate = dist[u] + w;
+    if (candidate < dist[v]) {
+      notes.push(`${u}→${v}: ${dist[v] === Infinity ? '∞' : dist[v]} → ${candidate}`);
+      dist[v] = candidate;
+      prev[v] = u;
+      changed = true;
+    }
+  });
+  changedLastRound = changed;
+  log(`Round ${round}: ` + (notes.length ? notes.join('; ') : 'no changes'), changed);
+  render();
+  if (!changed) {
+    log('No edge improved this round — distances have converged early.', false, true);
+    document.getElementById('stepBtn').disabled = true;
+  } else if (round >= maxRounds) {
+    log(`Reached the |V|-1 = ${maxRounds} round bound — distances are final.`, false, true);
+    document.getElementById('stepBtn').disabled = true;
+  }
+}
+
+function log(text, changed, done) {
+  const div = document.createElement('div');
+  if (done) div.className = 'done'; else if (changed) div.className = 'changed';
+  div.textContent = text;
+  document.getElementById('stepLog').appendChild(div);
+  document.getElementById('stepLog').scrollTop = document.getElementById('stepLog').scrollHeight;
+}
+
+function render() {
+  document.getElementById('distTable').innerHTML = Object.keys(NODES).map(id =>
+    `<tr><td>${id}</td><td>${dist[id] === Infinity ? '∞' : dist[id]}</td><td>${prev[id] || '—'}</td></tr>`
+  ).join('');
+
+  let svg = `
+    <defs>
+      <marker id="arrGrey" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#5c7089"/></marker>
+      <marker id="arrBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#38bdf8"/></marker>
+      <marker id="arrWarn" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#fbbf24"/></marker>
+    </defs>`;
+  EDGES.forEach(([u, v, w]) => {
+    const pa = NODES[u], pb = NODES[v];
+    const inTree = prev[v] === u;
+    const isNeg = w < 0;
+    const color = inTree ? '#38bdf8' : (isNeg ? '#fbbf24' : '#5c7089');
+    const marker = inTree ? 'arrBlue' : (isNeg ? 'arrWarn' : 'arrGrey');
+    const width = inTree ? 3 : 1.5;
+    // shorten the line slightly so the arrowhead doesn't sit under the node circle
+    const dx = pb.x - pa.x, dy = pb.y - pa.y, len = Math.hypot(dx, dy) || 1;
+    const ex = pb.x - (dx / len) * 22, ey = pb.y - (dy / len) * 22;
+    svg += `<line x1="${pa.x}" y1="${pa.y}" x2="${ex}" y2="${ey}" stroke="${color}" stroke-width="${width}" marker-end="url(#${marker})"/>`;
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    svg += `<text class="edge-label ${isNeg ? 'neg' : ''}" x="${mx}" y="${my - 6}">${w}</text>`;
+  });
+  Object.entries(NODES).forEach(([id, p]) => {
+    const known = dist[id] !== Infinity;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="20" fill="${known ? '#4ade80' : '#5c7089'}" stroke="#0f172a" stroke-width="2"/>`;
+    svg += `<text class="node-label" x="${p.x}" y="${p.y + 5}">${id}</text>`;
+  });
+  document.getElementById('bfSvg').innerHTML = svg;
+}
+
+resetBF();
+
+const QUIZ = [
+  {
+    q: 'Why does Bellman-Ford tolerate negative edge weights when Dijkstra does not?',
+    options: ['It uses a priority queue instead of a list', 'It relaxes every edge repeatedly instead of greedily committing to the "closest" node first', 'It runs faster', 'It only works on directed graphs'],
+    correct: 1,
+    explain: "Dijkstra permanently commits to a node's distance the moment it's visited; Bellman-Ford never commits early, so a later negative edge can still correct an earlier estimate."
+  },
+  {
+    q: 'What does it mean if a full round of Bellman-Ford relaxes zero edges?',
+    options: ['An error occurred', 'The graph has a negative cycle', 'Distances have converged — no further round can improve anything', 'The algorithm needs to restart'],
+    correct: 2,
+    explain: 'A round with no changes means every distance is already optimal, so the algorithm can stop early rather than running the full |V|-1 rounds.'
+  },
+  {
+    q: 'What does an (n+1)-th round still finding an improvement, after |V|-1 rounds, indicate?',
+    options: ['A bug in the implementation', 'The presence of a negative-weight cycle', 'The graph is disconnected', 'Nothing unusual'],
+    correct: 1,
+    explain: '|V|-1 rounds are mathematically enough to propagate any real shortest path. If something still improves after that, the "shortest path" isn\'t well-defined — there\'s a negative cycle.'
+  }
+];
+
+function renderQuiz() {
+  document.getElementById('quiz').innerHTML = QUIZ.map((item, qi) => `
+    <div class="quiz-q">
+      <div class="qtext">${qi + 1}. ${item.q}</div>
+      ${item.options.map((opt, oi) => `<label><input type="radio" name="q${qi}" value="${oi}"> ${opt}</label>`).join('')}
+      <button class="secondary" onclick="checkQuiz(${qi})">Check answer</button>
+      <div class="quiz-feedback" id="feedback${qi}"></div>
+    </div>
+  `).join('');
+}
+function checkQuiz(qi) {
+  const selected = document.querySelector(`input[name="q${qi}"]:checked`);
+  const feedback = document.getElementById('feedback' + qi);
+  if (!selected) { feedback.className = 'quiz-feedback incorrect'; feedback.textContent = 'Pick an answer first.'; return; }
+  const correct = Number(selected.value) === QUIZ[qi].correct;
+  feedback.className = 'quiz-feedback ' + (correct ? 'correct' : 'incorrect');
+  feedback.textContent = (correct ? '✓ Correct. ' : '✗ Not quite. ') + QUIZ[qi].explain;
+}
+renderQuiz();
+</script>
+</body>
+</html>

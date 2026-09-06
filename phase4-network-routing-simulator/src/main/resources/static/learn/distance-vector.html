@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Distance Vector Routing — Network Routing Simulator</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #263449; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0c4a6e;
+    --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { max-width: 920px; margin: 0 auto; padding: 24px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(74,222,128,0.15); color: var(--good); margin-right: 8px; }
+  h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 34px 0 14px; }
+  h1.title { font-size: 26px; margin: 6px 0 4px; }
+  .lede { color: var(--muted); font-size: 14.5px; margin-bottom: 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 4px; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 10px 0; }
+  th, td { text-align: center; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; color: var(--muted); }
+  th { color: var(--muted); font-weight: 500; }
+  td.changed { background: rgba(74,222,128,0.15); font-weight: 700; color: var(--good); }
+  td.unknown { color: var(--muted); }
+  button { cursor: pointer; background: var(--accent); color: #06202f; font-weight: 600; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; margin-right: 8px; margin-top: 6px; }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #dvSvg { width: 100%; height: 260px; background: #182436; border-radius: 8px; }
+  .node-label { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .edge-label { fill: var(--muted); font-size: 10.5px; text-anchor: middle; pointer-events: none; }
+  #stepLog { max-height: 140px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  #stepLog div { margin-bottom: 4px; color: var(--muted); }
+  #stepLog div.changed { color: var(--good); font-weight: 600; }
+  #stepLog div.done { color: var(--warn); font-weight: 700; }
+  .concept-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .concept-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; color: var(--muted); max-width: 260px; }
+  .concept-chip b { color: var(--text); }
+  .quiz-q { margin-bottom: 18px; }
+  .quiz-q .qtext { font-weight: 600; margin-bottom: 6px; }
+  .quiz-q label { display: block; font-size: 13.5px; margin-bottom: 4px; cursor: pointer; }
+  .quiz-feedback { font-size: 13px; margin-top: 6px; padding: 8px 10px; border-radius: 6px; display: none; }
+  .quiz-feedback.correct { background: rgba(74,222,128,0.12); color: var(--good); display: block; }
+  .quiz-feedback.incorrect { background: rgba(248,113,113,0.12); color: var(--bad); display: block; }
+  .step { display: flex; gap: 12px; margin-bottom: 10px; }
+  .step .num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .navrow { display: flex; justify-content: space-between; margin: 40px 0 20px; gap: 12px; }
+  .navrow button { flex: 1; text-align: left; padding: 12px 14px; }
+  .mistake { border-left: 3px solid var(--bad); padding: 8px 12px; background: var(--panel-2); border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Network Routing Simulator — Learn</h1>
+  <div><a href="/learn/index.html" style="margin-right:16px;">📚 Learn hub</a><a href="/">← Back to simulator</a></div>
+</header>
+
+<main>
+  <span class="badge">Level 4 — Routing</span>
+  <h1 class="title">Distance Vector Routing</h1>
+  <p class="lede">How real routers converge on shortest paths without any single one of them ever seeing the whole network.</p>
+
+  <h2 class="section">1 · Overview</h2>
+  <p>
+    Dijkstra and Bellman-Ford both assume something no real router actually has: a complete view
+    of the whole graph. <b>Distance vector routing</b> is how routing actually works in protocols
+    like RIP — each router only knows two things: the cost to its <i>direct</i> neighbors, and
+    whatever those neighbors currently claim about everyone else. By repeatedly gossiping these
+    claims, the whole network's tables gradually converge to the true shortest distances —
+    without a single router ever seeing the full map.
+  </p>
+
+  <h2 class="section">2 · Why it exists</h2>
+  <p>
+    Giving every router a full copy of the network graph (as Dijkstra/Bellman-Ford require) doesn't
+    scale, and doesn't match reality — routers only physically connect to a few neighbors.
+    Distance vector routing solves this with only local information and local communication,
+    at the cost of slower convergence and some correctness edge-cases (like "counting to infinity"
+    after certain failures) that link-state protocols were later designed to avoid.
+  </p>
+
+  <h2 class="section">3 · Real-world analogy</h2>
+  <p>
+    It's office gossip about who's fastest at a task. You don't personally know everyone in the
+    company — but your deskmate tells you "I heard Priya can do it in 3 days", and if you know it
+    takes you 1 day to relay a request to your deskmate, you now know "via my deskmate, Priya is 4
+    days away" — without ever meeting Priya. Everyone keeps updating their own belief this way
+    until the gossip settles on the true fastest route to everyone.
+  </p>
+
+  <h2 class="section">4 · Technical explanation</h2>
+  <div class="step"><div class="num">1</div><div>Each router starts knowing only itself, at cost 0.</div></div>
+  <div class="step"><div class="num">2</div><div>Each round, every router sends its <b>entire current vector</b> (destination → cost) to each direct neighbor.</div></div>
+  <div class="step"><div class="num">3</div><div>Each router receiving a neighbor's vector adds the cost of that link to every entry in it, and keeps whichever is cheaper: what it already knew, or this new via-neighbor option.</div></div>
+  <div class="step"><div class="num">4</div><div>Repeat every round. Once a full round changes nothing anywhere, the network has converged.</div></div>
+
+  <h2 class="section">5 · Interactive demonstration</h2>
+  <div class="panel">
+    <p style="margin-top:0;font-size:13px;color:var(--muted);">
+      Same network as the Dijkstra lesson, so you can compare the two approaches directly — they
+      converge to the same final answer via a completely different process. Click <b>Run round</b>
+      to simulate one round of every router gossiping with its neighbors simultaneously.
+    </p>
+    <svg id="dvSvg" viewBox="0 0 640 260"></svg>
+    <div>
+      <button id="stepBtn" onclick="stepRound()">▶ Run round</button>
+      <button class="secondary" onclick="resetDV()">↺ Reset</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:2px;">
+      Each row is one router's current vector — what it currently believes the cost is to reach each destination.
+      Green cells changed this round.
+    </p>
+    <div style="overflow-x:auto;"><table id="vectorTable"></table></div>
+    <div id="stepLog"></div>
+  </div>
+
+  <h2 class="section">6 · Step-by-step worked example (narrated)</h2>
+  <div class="step"><div class="num">1</div><div>Round 1: every router learns its <i>direct</i> neighbors' costs — that's as far as one round of gossip can reach.</div></div>
+  <div class="step"><div class="num">2</div><div>Round 2: routers now also learn about their <i>neighbors' neighbors</i>, because that information arrived in round 1's gossip and gets relayed onward.</div></div>
+  <div class="step"><div class="num">3</div><div>Each further round extends everyone's knowledge one more "hop" of gossip outward, and corrects any entry where a cheaper path was just discovered.</div></div>
+  <div class="step"><div class="num">4</div><div>Once nothing changes in a full round, run the same demo on the Dijkstra lesson and compare — the final distances from A should match exactly.</div></div>
+
+  <h2 class="section">7 · Common mistakes</h2>
+  <div class="mistake"><b>Assuming convergence is instant.</b> Information has to physically propagate hop-by-hop through gossip rounds — a distant router can take several rounds to learn about a far-away change.</div>
+  <div class="mistake"><b>Forgetting routers only know cost, not the actual path.</b> A distance-vector router knows "reach X for cost 7 via neighbor Y" — it does <i>not</i> know the full route beyond that one next hop, unlike link-state protocols that build a complete map.</div>
+  <div class="mistake"><b>Not accounting for "counting to infinity".</b> When a link fails, distance-vector protocols can briefly and repeatedly propagate stale, gradually-worsening estimates back and forth before converging — a well-known failure mode that real protocols like RIP add special-case rules to limit.</div>
+
+  <h2 class="section">8 · Practical scenario</h2>
+  <p>
+    This is exactly what the simulator's <code>distance-vector</code> algorithm option does under
+    the hood: it doesn't let any router "cheat" by seeing the whole topology — it only lets
+    information flow along real links, round by round, the same way this demo does.
+  </p>
+
+  <h2 class="section">9 · Mini quiz</h2>
+  <div class="panel" id="quiz"></div>
+
+  <h2 class="section">10 · Related concepts</h2>
+  <div class="concept-list">
+    <div class="concept-chip"><b>Dijkstra's algorithm</b> — same final answer, but requires a full view of the graph.</div>
+    <div class="concept-chip"><b>Bellman-Ford</b> — the centralized version of the same "relax repeatedly" idea.</div>
+    <div class="concept-chip"><b>Counting to infinity</b> — a classic distance-vector convergence problem after link failures.</div>
+  </div>
+
+  <div class="navrow">
+    <button class="secondary" onclick="location.href='/learn/bellman-ford.html'">◀ Previous: Bellman-Ford</button>
+    <button class="secondary" disabled>Next lesson (coming soon) ▶</button>
+  </div>
+</main>
+
+<script>
+// Same graph as the Dijkstra lesson, so results are directly comparable.
+const NODES = {
+  A: { x: 70, y: 150 }, C: { x: 220, y: 220 }, B: { x: 220, y: 80 },
+  D: { x: 400, y: 170 }, E: { x: 560, y: 80 }, F: { x: 560, y: 220 }
+};
+const EDGES = [
+  ['A', 'B', 4], ['A', 'C', 1], ['C', 'B', 2], ['B', 'D', 5],
+  ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2], ['D', 'F', 6], ['E', 'F', 3]
+];
+const IDS = Object.keys(NODES);
+
+let vectors, round, changedLastRound, lastChanged;
+
+function neighborsOf(id) {
+  const result = [];
+  EDGES.forEach(([a, b, w]) => { if (a === id) result.push([b, w]); if (b === id) result.push([a, w]); });
+  return result;
+}
+
+function resetDV() {
+  vectors = {};
+  IDS.forEach(id => vectors[id] = { [id]: 0 });
+  round = 0; changedLastRound = true; lastChanged = new Set();
+  document.getElementById('stepLog').innerHTML = '';
+  document.getElementById('stepBtn').disabled = false;
+  render();
+}
+
+function stepRound() {
+  if (!changedLastRound || round >= 8) return;
+  round++;
+  const newVectors = JSON.parse(JSON.stringify(vectors));
+  let changed = false;
+  const changedSet = new Set();
+  const notes = [];
+
+  IDS.forEach(nodeId => {
+    neighborsOf(nodeId).forEach(([neighborId, weight]) => {
+      Object.entries(vectors[neighborId] || {}).forEach(([dest, cost]) => {
+        const candidate = cost + weight;
+        if (newVectors[nodeId][dest] === undefined || candidate < newVectors[nodeId][dest]) {
+          newVectors[nodeId][dest] = candidate;
+          changed = true;
+          changedSet.add(nodeId + '|' + dest);
+          notes.push(`${nodeId} learns ${dest}=${candidate} via ${neighborId}`);
+        }
+      });
+    });
+  });
+
+  vectors = newVectors;
+  changedLastRound = changed;
+  lastChanged = changedSet;
+  log(`Round ${round}: ` + (notes.length ? notes.slice(0, 6).join('; ') + (notes.length > 6 ? ` …and ${notes.length - 6} more` : '') : 'no changes'), changed);
+  render();
+  if (!changed) {
+    log('No vector changed this round — the network has converged.', false, true);
+    document.getElementById('stepBtn').disabled = true;
+  } else if (round >= 8) {
+    log('Stopped after 8 rounds (safety cap for this demo).', false, true);
+    document.getElementById('stepBtn').disabled = true;
+  }
+}
+
+function log(text, changed, done) {
+  const div = document.createElement('div');
+  if (done) div.className = 'done'; else if (changed) div.className = 'changed';
+  div.textContent = text;
+  document.getElementById('stepLog').appendChild(div);
+  document.getElementById('stepLog').scrollTop = document.getElementById('stepLog').scrollHeight;
+}
+
+function render() {
+  let head = '<thead><tr><th>Router</th>' + IDS.map(d => `<th>${d}</th>`).join('') + '</tr></thead>';
+  let body = '<tbody>' + IDS.map(nodeId => {
+    const cells = IDS.map(dest => {
+      const val = vectors[nodeId][dest];
+      const changed = lastChanged.has(nodeId + '|' + dest);
+      if (val === undefined) return `<td class="unknown">—</td>`;
+      return `<td class="${changed ? 'changed' : ''}">${val}</td>`;
+    }).join('');
+    return `<tr><td>${nodeId}</td>${cells}</tr>`;
+  }).join('') + '</tbody>';
+  document.getElementById('vectorTable').innerHTML = head + body;
+
+  let svg = '';
+  EDGES.forEach(([a, b, w]) => {
+    const pa = NODES[a], pb = NODES[b];
+    svg += `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="#5c7089" stroke-width="1.5"/>`;
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    svg += `<text class="edge-label" x="${mx}" y="${my - 5}">${w}</text>`;
+  });
+  Object.entries(NODES).forEach(([id, p]) => {
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="18" fill="#4ade80" fill-opacity="0.3" stroke="#4ade80" stroke-width="2"/>`;
+    svg += `<text class="node-label" x="${p.x}" y="${p.y + 4}">${id}</text>`;
+  });
+  document.getElementById('dvSvg').innerHTML = svg;
+}
+
+resetDV();
+
+const QUIZ = [
+  {
+    q: "What does a distance-vector router actually know about a route to a far-away destination?",
+    options: ["The full hop-by-hop path", "Only the total cost and which direct neighbor to forward through next", "Nothing until it directly connects", "The entire network topology"],
+    correct: 1,
+    explain: "Distance-vector routers only ever know cost + next hop — never the full downstream path, unlike link-state approaches."
+  },
+  {
+    q: 'Why can distance-vector convergence take multiple rounds even in a small network?',
+    options: ['Because routers are slow computers', 'Because information about a distant router can only spread one hop of gossip per round', 'Because the algorithm is randomized', 'It never takes more than one round'],
+    correct: 1,
+    explain: 'Each round only propagates information one hop further — reaching a router 3 hops away takes at least 3 rounds.'
+  },
+  {
+    q: 'What real-world convergence problem is distance-vector routing well known for?',
+    options: ['Stack overflow', 'Counting to infinity after a link failure', 'Running out of memory', 'It cannot detect any failures'],
+    correct: 1,
+    explain: 'After certain failures, routers can briefly keep telling each other slowly-worsening stale costs back and forth before settling — the classic "count to infinity" problem.'
+  }
+];
+function renderQuiz() {
+  document.getElementById('quiz').innerHTML = QUIZ.map((item, qi) => `
+    <div class="quiz-q">
+      <div class="qtext">${qi + 1}. ${item.q}</div>
+      ${item.options.map((opt, oi) => `<label><input type="radio" name="q${qi}" value="${oi}"> ${opt}</label>`).join('')}
+      <button class="secondary" onclick="checkQuiz(${qi})">Check answer</button>
+      <div class="quiz-feedback" id="feedback${qi}"></div>
+    </div>
+  `).join('');
+}
+function checkQuiz(qi) {
+  const selected = document.querySelector(`input[name="q${qi}"]:checked`);
+  const feedback = document.getElementById('feedback' + qi);
+  if (!selected) { feedback.className = 'quiz-feedback incorrect'; feedback.textContent = 'Pick an answer first.'; return; }
+  const correct = Number(selected.value) === QUIZ[qi].correct;
+  feedback.className = 'quiz-feedback ' + (correct ? 'correct' : 'incorrect');
+  feedback.textContent = (correct ? '✓ Correct. ' : '✗ Not quite. ') + QUIZ[qi].explain;
+}
+renderQuiz();
+</script>
+</body>
+</html>

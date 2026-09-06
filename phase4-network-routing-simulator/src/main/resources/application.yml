@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: network-routing-simulator
+  datasource:
+    # File-based H2 (not a pure in-memory DB) so topologies and run
+    # history survive an app restart with zero setup — the .db file
+    # lives under ./data/ next to wherever you run the jar from.
+    url: jdbc:h2:file:./data/netsim;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  flyway:
+    # Manages ONLY the JPA-free topology_snapshot table (see
+    # db/migration/V1__topology_snapshot.sql). Hibernate's ddl-auto
+    # above still owns the entity-mapped tables from Phase 2/3 — the
+    # two don't touch the same tables, so there's no ordering conflict.
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  demo:
+    # Seeds a small demo topology + runs one simulation on the very
+    # first startup (skipped once any topology exists in the DB).
+    # Set to false to start with a completely empty system.
+    seed-enabled: true

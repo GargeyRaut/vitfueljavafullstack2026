@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dijkstra's Algorithm — Network Routing Simulator</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel-2: #263449; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent-dim: #0c4a6e;
+    --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  @keyframes pulseRing { 0% { stroke-width: 2; opacity: 1; } 70% { stroke-width: 10; opacity: 0; } 100% { stroke-width: 10; opacity: 0; } }
+  header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0;
+    background: var(--bg); z-index: 5;
+  }
+  header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(56,189,248,0.15); color: var(--accent); margin-right: 8px;
+  }
+  h2.section {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent);
+    border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 34px 0 14px;
+  }
+  h1.title { font-size: 26px; margin: 6px 0 4px; }
+  .lede { color: var(--muted); font-size: 14.5px; margin-bottom: 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 4px; }
+  .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  tr.visited td { color: var(--good); }
+  tr.current td { background: rgba(56,189,248,0.12); font-weight: 600; }
+  button {
+    cursor: pointer; background: var(--accent); color: #06202f; font-weight: 600; border: none;
+    border-radius: 6px; padding: 8px 14px; font-size: 13px; margin-right: 8px; margin-top: 6px;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(0.97); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #dijkstraSvg { width: 100%; height: 300px; background: #182436; border-radius: 8px; }
+  .node-label { fill: #fff; font-size: 13px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .edge-label { fill: var(--muted); font-size: 10.5px; text-anchor: middle; pointer-events: none; }
+  #stepLog {
+    max-height: 160px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 11.5px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 10px;
+  }
+  #stepLog div { margin-bottom: 4px; color: var(--muted); }
+  #stepLog div.visit { color: var(--good); font-weight: 600; }
+  .concept-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .concept-chip {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; color: var(--muted); max-width: 260px;
+  }
+  .concept-chip b { color: var(--text); }
+  .quiz-q { margin-bottom: 18px; }
+  .quiz-q .qtext { font-weight: 600; margin-bottom: 6px; }
+  .quiz-q label { display: block; font-size: 13.5px; margin-bottom: 4px; cursor: pointer; }
+  .quiz-feedback { font-size: 13px; margin-top: 6px; padding: 8px 10px; border-radius: 6px; display: none; }
+  .quiz-feedback.correct { background: rgba(74,222,128,0.12); color: var(--good); display: block; }
+  .quiz-feedback.incorrect { background: rgba(248,113,113,0.12); color: var(--bad); display: block; }
+  .step { display: flex; gap: 12px; margin-bottom: 10px; }
+  .step .num {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .navrow { display: flex; justify-content: space-between; margin: 40px 0 20px; gap: 12px; }
+  .navrow button { flex: 1; text-align: left; padding: 12px 14px; }
+  .mistake { border-left: 3px solid var(--bad); padding: 8px 12px; background: var(--panel-2); border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📘 Network Routing Simulator — Learn</h1>
+  <div>
+    <a href="/learn/index.html" style="margin-right:16px;">📚 Learn hub</a>
+    <a href="/">← Back to simulator</a>
+  </div>
+</header>
+
+<main>
+  <span class="badge">Level 4 — Routing</span>
+  <h1 class="title">Dijkstra's Algorithm</h1>
+  <p class="lede">The exact shortest-path algorithm this simulator uses when you pick "dijkstra" — walked through one step at a time.</p>
+
+  <h2 class="section">1 · Overview</h2>
+  <p>
+    Dijkstra's algorithm finds the cheapest path from one starting node to every other node in a
+    weighted graph, by always exploring the closest unvisited node next. It never has to
+    "backtrack" — once a node is visited, its shortest distance is final.
+  </p>
+
+  <h2 class="section">2 · Why it exists</h2>
+  <p>
+    Trying every possible path between two points gets astronomically expensive as a network
+    grows. Dijkstra's insight — greedily expand the cheapest frontier node first — finds the
+    guaranteed-optimal answer while only ever looking at each edge a handful of times. It's the
+    basis for real link-state routing protocols like OSPF.
+  </p>
+
+  <h2 class="section">3 · Real-world analogy</h2>
+  <p>
+    Picture filling a room with water from a source point. The water reaches the closest walls
+    first, then gradually spreads outward — by the time it reaches any given point, it has
+    necessarily arrived via the shortest possible path from the source. Dijkstra's algorithm
+    "floods" outward from the start node in exactly this order: always advancing to whichever
+    unvisited point is currently closest.
+  </p>
+
+  <h2 class="section">4 · Technical explanation</h2>
+  <div class="step"><div class="num">1</div><div>Set distance to the start node = 0, and every other node = infinity.</div></div>
+  <div class="step"><div class="num">2</div><div>Repeat: among all <b>unvisited</b> nodes, pick the one with the smallest known distance.</div></div>
+  <div class="step"><div class="num">3</div><div>Mark it visited — its distance is now final and will never change again.</div></div>
+  <div class="step"><div class="num">4</div><div><b>Relax</b> each of its neighbors: if going through this node gives a shorter path than what's currently recorded, update the neighbor's distance and remember this node as its predecessor.</div></div>
+  <div class="step"><div class="num">5</div><div>Repeat until every reachable node has been visited.</div></div>
+
+  <h2 class="section">5 · Interactive demonstration</h2>
+  <div class="panel">
+    <p style="margin-top:0;font-size:13px;color:var(--muted);">
+      Click <b>Step</b> repeatedly to run the algorithm from <b>A</b> one visit at a time. Green = visited
+      (distance final), blue = currently being visited, grey = not yet visited. Blue edges show the
+      shortest-path tree built so far.
+    </p>
+    <svg id="dijkstraSvg" viewBox="0 0 640 300"></svg>
+    <div>
+      <button id="stepBtn" onclick="stepDijkstra()">▶ Step</button>
+      <button class="secondary" onclick="resetDijkstra()">↺ Reset</button>
+    </div>
+    <table>
+      <thead><tr><th>Node</th><th>Distance from A</th><th>Via</th></tr></thead>
+      <tbody id="distTable"></tbody>
+    </table>
+    <div id="stepLog"></div>
+  </div>
+
+  <h2 class="section">6 · Step-by-step worked example (narrated)</h2>
+  <p>Running the demo above from start to finish on this graph produces exactly this sequence:</p>
+  <div class="step"><div class="num">1</div><div>Visit <b>A</b> (distance 0). Relax B (→4) and C (→1).</div></div>
+  <div class="step"><div class="num">2</div><div>Visit <b>C</b> (distance 1, the smallest so far). Relax B (1+2=3, better than 4 → update), D (1+8=9), E (1+10=11).</div></div>
+  <div class="step"><div class="num">3</div><div>Visit <b>B</b> (distance 3). Relax D (3+5=8, better than 9 → update).</div></div>
+  <div class="step"><div class="num">4</div><div>Visit <b>D</b> (distance 8). Relax E (8+2=10, better than 11 → update), F (8+6=14).</div></div>
+  <div class="step"><div class="num">5</div><div>Visit <b>E</b> (distance 10). Relax F (10+3=13, better than 14 → update).</div></div>
+  <div class="step"><div class="num">6</div><div>Visit <b>F</b> (distance 13). No unvisited neighbors left — done.</div></div>
+
+  <h2 class="section">7 · Common mistakes</h2>
+  <div class="mistake"><b>Assuming a shorter path can still appear after a node is visited.</b> Once a node is visited in Dijkstra, its distance is mathematically final — this only holds because all edge weights are non-negative.</div>
+  <div class="mistake"><b>Using Dijkstra with negative edge weights.</b> A negative edge could make a "later" path cheaper than an already-finalized one, breaking the algorithm's core guarantee. Bellman-Ford handles that case instead — see the simulator's other routing algorithms.</div>
+  <div class="mistake"><b>Confusing "visited" with "discovered".</b> A node can have a known (even final) tentative distance from relaxation without being visited yet — visiting is a separate, deliberate step of picking the current minimum.</div>
+
+  <h2 class="section">8 · Practical scenario</h2>
+  <p>
+    This is exactly what happens when you click <b>Run simulation</b> with the <code>dijkstra</code>
+    algorithm selected back in the simulator: every router's latency to every neighbor becomes an
+    edge weight, and the engine runs precisely this algorithm to compute the cheapest-latency path
+    before sending the simulated packet along it.
+  </p>
+
+  <h2 class="section">9 · Mini quiz</h2>
+  <div class="panel" id="quiz"></div>
+
+  <h2 class="section">10 · Related concepts</h2>
+  <div class="concept-list">
+    <div class="concept-chip"><b>Bellman-Ford</b> — a slower but more general alternative that tolerates negative weights.</div>
+    <div class="concept-chip"><b>Distance vector routing</b> — achieves a similar result without any single node seeing the whole graph.</div>
+    <div class="concept-chip"><b>Priority queues</b> — the data structure real implementations use to efficiently find the next closest node.</div>
+    <div class="concept-chip"><b>Longest Prefix Match</b> — a different routing decision made after a path is already known.</div>
+  </div>
+
+  <div class="navrow">
+    <button class="secondary" onclick="location.href='/learn/longest-prefix-match.html'">◀ Previous: Longest Prefix Match</button>
+    <button onclick="location.href='/learn/bellman-ford.html'">Next: Bellman-Ford Algorithm ▶</button>
+  </div>
+</main>
+
+<script>
+// ---------- Sample graph ----------
+const NODES = {
+  A: { x: 70, y: 170 }, C: { x: 220, y: 250 }, B: { x: 220, y: 90 },
+  D: { x: 400, y: 190 }, E: { x: 560, y: 90 }, F: { x: 560, y: 250 }
+};
+const EDGES = [
+  ['A', 'B', 4], ['A', 'C', 1], ['C', 'B', 2], ['B', 'D', 5],
+  ['C', 'D', 8], ['C', 'E', 10], ['D', 'E', 2], ['D', 'F', 6], ['E', 'F', 3]
+];
+const START = 'A';
+
+let dist, prev, visited, unvisited, currentNode;
+
+function neighborsOf(id) {
+  const result = [];
+  EDGES.forEach(([a, b, w]) => {
+    if (a === id) result.push([b, w]);
+    if (b === id) result.push([a, w]);
+  });
+  return result;
+}
+
+function resetDijkstra() {
+  dist = {}; prev = {};
+  Object.keys(NODES).forEach(id => dist[id] = id === START ? 0 : Infinity);
+  visited = new Set();
+  unvisited = new Set(Object.keys(NODES));
+  currentNode = null;
+  document.getElementById('stepLog').innerHTML = '';
+  document.getElementById('stepBtn').disabled = false;
+  render();
+}
+
+function stepDijkstra() {
+  if (unvisited.size === 0) return;
+  let u = null, best = Infinity;
+  unvisited.forEach(id => { if (dist[id] < best) { best = dist[id]; u = id; } });
+
+  if (u === null) {
+    log(`Remaining node(s) {${[...unvisited].join(', ')}} are unreachable from ${START} — stopping.`);
+    unvisited.clear();
+    document.getElementById('stepBtn').disabled = true;
+    render();
+    return;
+  }
+
+  visited.add(u);
+  unvisited.delete(u);
+  currentNode = u;
+  log(`Visit ${u} — distance ${dist[u]} is now final.`, true);
+
+  neighborsOf(u).forEach(([v, w]) => {
+    if (visited.has(v)) return;
+    const candidate = dist[u] + w;
+    if (candidate < dist[v]) {
+      const oldVal = dist[v] === Infinity ? '∞' : dist[v];
+      log(`&nbsp;&nbsp;Relax ${u}→${v}: ${oldVal} → ${candidate} (via ${u})`);
+      dist[v] = candidate;
+      prev[v] = u;
+    }
+  });
+
+  if (unvisited.size === 0) {
+    log('All reachable nodes visited — algorithm complete.', true);
+    document.getElementById('stepBtn').disabled = true;
+  }
+  render();
+}
+
+function log(text, strong) {
+  const div = document.createElement('div');
+  if (strong) div.className = 'visit';
+  div.innerHTML = text;
+  document.getElementById('stepLog').appendChild(div);
+  document.getElementById('stepLog').scrollTop = document.getElementById('stepLog').scrollHeight;
+}
+
+function render() {
+  // distance table
+  document.getElementById('distTable').innerHTML = Object.keys(NODES).map(id => {
+    const cls = id === currentNode ? 'current' : (visited.has(id) ? 'visited' : '');
+    return `<tr class="${cls}"><td>${id}</td><td>${dist[id] === Infinity ? '∞' : dist[id]}</td><td>${prev[id] || '—'}</td></tr>`;
+  }).join('');
+
+  // graph
+  let svg = '';
+  EDGES.forEach(([a, b, w]) => {
+    const pa = NODES[a], pb = NODES[b];
+    const inTree = (prev[b] === a || prev[a] === b);
+    const color = inTree ? '#38bdf8' : '#5c7089';
+    const width = inTree ? 3.5 : 1.5;
+    svg += `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="${color}" stroke-width="${width}"/>`;
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    svg += `<text class="edge-label" x="${mx}" y="${my - 5}">${w}</text>`;
+  });
+  Object.entries(NODES).forEach(([id, p]) => {
+    const fill = id === currentNode ? '#38bdf8' : (visited.has(id) ? '#4ade80' : '#5c7089');
+    if (id === currentNode) {
+      svg += `<circle cx="${p.x}" cy="${p.y}" r="20" fill="none" stroke="#38bdf8" style="animation:pulseRing 1.4s ease-out infinite;"/>`;
+    }
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="20" fill="${fill}" stroke="#0f172a" stroke-width="2"/>`;
+    svg += `<text class="node-label" x="${p.x}" y="${p.y + 5}">${id}</text>`;
+  });
+  document.getElementById('dijkstraSvg').innerHTML = svg;
+}
+
+resetDijkstra();
+
+// ---------- Mini quiz ----------
+const QUIZ = [
+  {
+    q: "Why can't Dijkstra's algorithm be used correctly on a graph with negative edge weights?",
+    options: ['It can — negative weights are fine', 'A later path through a negative edge could beat an already-"finalized" distance, breaking the algorithm\'s core assumption', 'Negative weights cause an infinite loop', 'Negative weights are only a problem for Bellman-Ford'],
+    correct: 1,
+    explain: "Dijkstra assumes that once a node is visited, no other path can ever be shorter — a negative edge can violate that after the fact."
+  },
+  {
+    q: 'At each step, which unvisited node does Dijkstra visit next?',
+    options: ['A random one', 'The one with the most neighbors', 'The one with the smallest currently-known distance', 'The one closest to the destination'],
+    correct: 2,
+    explain: 'Dijkstra always greedily expands the closest known unvisited node — that\'s what guarantees the final distances are optimal.'
+  },
+  {
+    q: 'What does "relaxing" an edge mean?',
+    options: ['Deleting the edge from the graph', 'Checking if going through the current node gives a shorter path to a neighbor, and updating if so', 'Marking the edge as visited', 'Increasing the edge\'s weight'],
+    correct: 1,
+    explain: 'Relaxing just means testing "is dist[current] + weight better than what I currently have for this neighbor?" and updating if yes.'
+  }
+];
+
+function renderQuiz() {
+  document.getElementById('quiz').innerHTML = QUIZ.map((item, qi) => `
+    <div class="quiz-q">
+      <div class="qtext">${qi + 1}. ${item.q}</div>
+      ${item.options.map((opt, oi) => `<label><input type="radio" name="q${qi}" value="${oi}"> ${opt}</label>`).join('')}
+      <button class="secondary" onclick="checkQuiz(${qi})">Check answer</button>
+      <div class="quiz-feedback" id="feedback${qi}"></div>
+    </div>
+  `).join('');
+}
+
+function checkQuiz(qi) {
+  const selected = document.querySelector(`input[name="q${qi}"]:checked`);
+  const feedback = document.getElementById('feedback' + qi);
+  if (!selected) { feedback.className = 'quiz-feedback incorrect'; feedback.textContent = 'Pick an answer first.'; return; }
+  const correct = Number(selected.value) === QUIZ[qi].correct;
+  feedback.className = 'quiz-feedback ' + (correct ? 'correct' : 'incorrect');
+  feedback.textContent = (correct ? '✓ Correct. ' : '✗ Not quite. ') + QUIZ[qi].explain;
+}
+
+renderQuiz();
+</script>
+</body>
+</html>
